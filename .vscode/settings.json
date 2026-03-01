@@ -1,0 +1,21 @@
+{
+    "C_Cpp.codeAnalysis.clangTidy.enabled": true,
+    "C_Cpp.codeAnalysis.clangTidy.path": "/usr/local/opt/llvm/bin/clang-tidy",
+    "C_Cpp.codeAnalysis.clangTidy.useBuildPath": true,
+    "C_Cpp.codeAnalysis.clangTidy.checks.disabled": [],
+    "C_Cpp.codeAnalysis.clangTidy.args": [
+        "--extra-arg=-ferror-limit=1"
+    ],
+    "C_Cpp.codeAnalysis.exclude": {
+        "**/build/**": true
+    },
+    "[cpp]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools"
+    },
+    "[c]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools"
+    },
+    "C_Cpp.clang_format_style": "file:${workspaceFolder}/.clang-format",
+    "C_Cpp.formatting": "clangFormat",
+    "editor.formatOnSave": true
+}
