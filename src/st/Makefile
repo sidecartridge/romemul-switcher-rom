@@ -11,7 +11,7 @@ CFLAGS := -m68000 -std=gnu99 -ffreestanding -fomit-frame-pointer -O2 -Wall -Wext
 ASFLAGS := -m68000 -x assembler-with-cpp -nostdlib
 LDFLAGS := -nostdlib -Wl,--traditional-format,-Map=$(TARGET_MAP)
 
-SRCS_C := rom_switcher.c
+SRCS_C := rom_switcher.c text.c
 SRCS_S := start.s
 
 OBJS := $(SRCS_C:%=$(BUILD_DIR)/%.o) $(SRCS_S:%=$(BUILD_DIR)/%.o)

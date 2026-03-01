@@ -1,5 +1,6 @@
 #include "rom_switcher.h"
 #include "../common/romemul_hw.h"
+#include "text.h"
 
 static const uint16_t kForegroundColors[] = {
     COLOR_LIGHT,
@@ -35,8 +36,10 @@ void rom_switcher_main(void)
 {
     uint8_t current_bank = 0;
 
+    text_init();
     st_draw_banner();
     apply_bank(current_bank);
+    text_print_menu(current_bank);
 
     for (;;) {
         uint8_t scan = st_poll_scancode();
@@ -54,6 +57,7 @@ void rom_switcher_main(void)
         if (mapped != 0xFF && mapped != current_bank) {
             current_bank = mapped;
             apply_bank(current_bank);
+            text_print_menu(current_bank);
         }
     }
 }
