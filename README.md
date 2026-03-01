@@ -18,8 +18,8 @@ platforms, sharing the same hardware abstraction layer.
   through hardware registers.
 - Plug-in hardware layer (`src/common/romemul_hw.h`) so the actual register map
   or handshake sequence can be adjusted without touching the rest of the code.
-- Minimal on-screen feedback implemented via direct video/palette pokes (ST
-  monochrome for now) to avoid host OS dependencies.
+- Minimal on-screen feedback implemented via a custom text renderer using
+  the public-domain font8x8 dataset (basic ASCII).
 
 ## Repository layout
 
