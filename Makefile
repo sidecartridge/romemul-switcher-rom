@@ -1,10 +1,19 @@
-STCMD ?= stcmd
-STCMD_ENV ?= STCMD_QUIET=1
-
-.PHONY: st clean
+.PHONY: st clean format format-check tidy check
 
 st:
-	$(STCMD_ENV) $(STCMD) make -C src/st
+	make -C src/st
+
+format:
+	./scripts/clang-checks.sh format
+
+format-check:
+	./scripts/clang-checks.sh format-check
+
+tidy:
+	./scripts/clang-checks.sh tidy
+
+check:
+	./scripts/clang-checks.sh check
 
 clean:
-	$(STCMD_ENV) $(STCMD) make -C src/st clean
+	make -C src/st clean
