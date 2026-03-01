@@ -1,11 +1,9 @@
 #include "rom_switcher.h"
 #include "../common/romemul_hw.h"
 
-static const uint16_t kBankPalette[] = {
-    COLOR_BANK0,
-    COLOR_BANK1,
-    COLOR_BANK2,
-    COLOR_BANK3
+static const uint16_t kForegroundColors[] = {
+    COLOR_LIGHT,
+    COLOR_DARK
 };
 
 static void delay(uint32_t loops)
@@ -19,7 +17,7 @@ static void apply_bank(uint8_t bank)
 {
     romemul_select_bank(bank);
     romemul_wait_ready();
-    st_set_border(kBankPalette[bank & 0x03]);
+    st_set_palette_pair(kForegroundColors[bank & 0x01]);
 }
 
 static uint8_t map_scancode(uint8_t code)
@@ -68,9 +66,10 @@ uint8_t st_poll_scancode(void)
     return ST_IKBD_DATA;
 }
 
-void st_set_border(uint16_t color)
+void st_set_palette_pair(uint16_t fg_color)
 {
-    ST_BORDER_COLOR = color & 0x0777;
+    ST_PALETTE_BASE[ST_PALETTE_BG_INDEX] = COLOR_DARK;
+    ST_PALETTE_BASE[ST_PALETTE_FG_INDEX] = fg_color & 0x0777;
 }
 
 void st_wait_vbl(void)
@@ -83,8 +82,5 @@ void st_wait_vbl(void)
 
 void st_draw_banner(void)
 {
-    // crude visual feedback: flash palette entries proportional to bank number
-    for (uint8_t i = 0; i < 4; ++i) {
-        ST_PALETTE_BASE[i] = kBankPalette[i];
-    }
+    st_set_palette_pair(COLOR_LIGHT);
 }
