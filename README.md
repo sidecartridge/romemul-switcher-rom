@@ -56,12 +56,33 @@ make st
 
 # Artefacts
 ls build/st
-# romemul_switcher.prg  romemul_switcher.bin  romemul_switcher.map
+# ROMSWITC.PRG  ROMSWITC.BIN  ROMSWITC.MAP
 ```
 
-`romemul_switcher.prg` keeps the TOS headers so the binary can be executed from
-RAM while iterating. `romemul_switcher.bin` is a flat image that can be burned
+`ROMSWITC.PRG` keeps the TOS headers so the binary can be executed from
+RAM while iterating. `ROMSWITC.BIN` is a flat image that can be burned
 into ROM.
+
+## Code style checks
+
+The repository includes `.clang-format`, `.clang-tidy`, and
+`.clang-tidy-ignore` at the top level. Use the helper targets:
+
+```bash
+# Auto-format C headers/sources under src/
+make format
+
+# Check formatting only (no edits)
+make format-check
+
+# Run clang-tidy checks
+make tidy
+
+# Run format-check + clang-tidy
+make check
+```
+
+All targets are implemented through `scripts/clang-checks.sh`.
 
 ## Configuring the hardware layer
 
