@@ -1,7 +1,16 @@
-.PHONY: st clean format format-check tidy check
+.PHONY: st debug test clean format format-check tidy check
+
+DEBUG ?= 0
+TEST ?= 0
 
 st:
-	make -C src/st
+	make -C src/st DEBUG=$(DEBUG) TEST=$(TEST)
+
+debug:
+	$(MAKE) st DEBUG=1
+
+test:
+	$(MAKE) st TEST=1
 
 format:
 	./scripts/clang-checks.sh format
