@@ -1,11 +1,12 @@
 #include "text.h"
 
-#include <limits.h>
-#include <stdarg.h>
-#include <stddef.h>
-
 #include "../st/glyph.h"
 #include "../st/term.h"
+
+typedef __builtin_va_list va_list;
+#define va_start __builtin_va_start
+#define va_end __builtin_va_end
+#define va_arg __builtin_va_arg
 
 enum {
   VT52_STATE_IDLE = 0U,
@@ -24,77 +25,78 @@ enum {
   kTabMask = 7U,
   kHexShiftStart = 28,
   kNibbleBitCount = 4,
+  kCharBitCount = 8,
   kHexNibbleMask = 0x0FU,
   kDecimalRadix = 10,
   kDigitsBufferSize = 16
 };
 
-static uint8_t gVt52State = VT52_STATE_IDLE;
-static uint8_t gVt52RowCode = 0U;
-static uint16_t gVt52SavedCol = 0U;
-static uint16_t gVt52SavedRow = 0U;
-static uint8_t gVt52Wrap = 1U;
-static uint8_t gVt52Reverse = 0U;
+static unsigned char gVt52State = VT52_STATE_IDLE;
+static unsigned char gVt52RowCode = 0U;
+static unsigned short gVt52SavedCol = 0U;
+static unsigned short gVt52SavedRow = 0U;
+static unsigned char gVt52Wrap = 1U;
+static unsigned char gVt52Reverse = 0U;
 
-static inline void textPutSpaceAt(uint16_t col, uint16_t row) {
+static inline void textPutSpaceAt(unsigned short col, unsigned short row) {
   glyph_plot(col, row, glyph_lookup(' '), TERM_TEXT_COLOR);
 }
 
-static volatile uint8_t *textRowPtr(uint16_t row) {
-  volatile uint8_t *videoPtr = TERM_VIDEO_BASE;
+static volatile unsigned char *textRowPtr(unsigned short row) {
+  volatile unsigned char *videoPtr = TERM_VIDEO_BASE;
   while (row--) {
     videoPtr += kTextRowBytes;
   }
   return videoPtr;
 }
 
-static void textClearRow(uint16_t row) {
-  volatile uint8_t *dst = textRowPtr(row);
-  for (uint16_t i = 0; i < kTextRowBytes; ++i) {
+static void textClearRow(unsigned short row) {
+  volatile unsigned char *dst = textRowPtr(row);
+  for (unsigned short i = 0; i < kTextRowBytes; ++i) {
     dst[i] = 0x00;
   }
 }
 
-static void textCopyRow(uint16_t dstRow, uint16_t srcRow) {
-  volatile uint8_t *src = textRowPtr(srcRow);
-  volatile uint8_t *dst = textRowPtr(dstRow);
-  for (uint16_t i = 0; i < kTextRowBytes; ++i) {
+static void textCopyRow(unsigned short dstRow, unsigned short srcRow) {
+  volatile unsigned char *src = textRowPtr(srcRow);
+  volatile unsigned char *dst = textRowPtr(dstRow);
+  for (unsigned short i = 0; i < kTextRowBytes; ++i) {
     dst[i] = src[i];
   }
 }
 
 static void textInsertLineAtCursor(void) {
-  const uint16_t row = TERM_CURSOR_ROW;
-  for (uint16_t rowIter = (uint16_t)(SCR_HEIGHT_LINES - 1U); rowIter > row;
+  const unsigned short row = TERM_CURSOR_ROW;
+  for (unsigned short rowIter = (unsigned short)(SCR_HEIGHT_LINES - 1U); rowIter > row;
        --rowIter) {
-    textCopyRow(rowIter, (uint16_t)(rowIter - 1U));
+    textCopyRow(rowIter, (unsigned short)(rowIter - 1U));
   }
   textClearRow(row);
 }
 
 static void textDeleteLineAtCursor(void) {
-  const uint16_t row = TERM_CURSOR_ROW;
-  for (uint16_t rowIter = row; rowIter + 1U < SCR_HEIGHT_LINES; ++rowIter) {
-    textCopyRow(rowIter, (uint16_t)(rowIter + 1U));
+  const unsigned short row = TERM_CURSOR_ROW;
+  for (unsigned short rowIter = row; rowIter + 1U < SCR_HEIGHT_LINES; ++rowIter) {
+    textCopyRow(rowIter, (unsigned short)(rowIter + 1U));
   }
-  textClearRow((uint16_t)(SCR_HEIGHT_LINES - 1U));
+  textClearRow((unsigned short)(SCR_HEIGHT_LINES - 1U));
 }
 
 static void textEraseLine(void) { textClearRow(TERM_CURSOR_ROW); }
 
 static void textEraseToEndOfLine(void) {
-  const uint16_t row = TERM_CURSOR_ROW;
-  for (uint16_t col = TERM_CURSOR_COL; col < SCR_WIDTH_CHARS; ++col) {
+  const unsigned short row = TERM_CURSOR_ROW;
+  for (unsigned short col = TERM_CURSOR_COL; col < SCR_WIDTH_CHARS; ++col) {
     textPutSpaceAt(col, row);
   }
 }
 
 static void textEraseToEndOfScreen(void) {
-  const uint16_t startRow = TERM_CURSOR_ROW;
-  const uint16_t startCol = TERM_CURSOR_COL;
+  const unsigned short startRow = TERM_CURSOR_ROW;
+  const unsigned short startCol = TERM_CURSOR_COL;
 
-  for (uint16_t row = startRow; row < SCR_HEIGHT_LINES; ++row) {
-    uint16_t col = (row == startRow) ? startCol : 0U;
+  for (unsigned short row = startRow; row < SCR_HEIGHT_LINES; ++row) {
+    unsigned short col = (row == startRow) ? startCol : 0U;
     for (; col < SCR_WIDTH_CHARS; ++col) {
       textPutSpaceAt(col, row);
     }
@@ -102,28 +104,28 @@ static void textEraseToEndOfScreen(void) {
 }
 
 static void textEraseToStartOfLine(void) {
-  const uint16_t row = TERM_CURSOR_ROW;
-  for (uint16_t col = 0; col <= TERM_CURSOR_COL; ++col) {
+  const unsigned short row = TERM_CURSOR_ROW;
+  for (unsigned short col = 0; col <= TERM_CURSOR_COL; ++col) {
     textPutSpaceAt(col, row);
   }
 }
 
 static void textEraseToStartOfScreen(void) {
-  const uint16_t endRow = TERM_CURSOR_ROW;
-  const uint16_t endCol = TERM_CURSOR_COL;
+  const unsigned short endRow = TERM_CURSOR_ROW;
+  const unsigned short endCol = TERM_CURSOR_COL;
 
-  for (uint16_t row = 0; row <= endRow; ++row) {
-    uint16_t colEnd =
-        (row == endRow) ? endCol : (uint16_t)(SCR_WIDTH_CHARS - 1U);
-    for (uint16_t col = 0; col <= colEnd; ++col) {
+  for (unsigned short row = 0; row <= endRow; ++row) {
+    unsigned short colEnd =
+        (row == endRow) ? endCol : (unsigned short)(SCR_WIDTH_CHARS - 1U);
+    for (unsigned short col = 0; col <= colEnd; ++col) {
       textPutSpaceAt(col, row);
     }
   }
 }
 
 static void textPutcRaw(char character) {
-  uint16_t cursorCol = TERM_CURSOR_COL;
-  uint16_t cursorRow = TERM_CURSOR_ROW;
+  unsigned short cursorCol = TERM_CURSOR_COL;
+  unsigned short cursorRow = TERM_CURSOR_ROW;
 
   if (character == '\n') {
     cursorCol = 0;
@@ -137,11 +139,11 @@ static void textPutcRaw(char character) {
   }
 
   {
-    const uint8_t *glyph = glyph_lookup(character);
+    const unsigned char *glyph = glyph_lookup(character);
     if (gVt52Reverse) {
-      uint8_t inv[SCR_CHAR_H];
-      for (uint8_t i = 0; i < SCR_CHAR_H; ++i) {
-        inv[i] = (uint8_t)~glyph[i];
+      unsigned char inv[SCR_CHAR_H];
+      for (unsigned char i = 0; i < SCR_CHAR_H; ++i) {
+        inv[i] = (unsigned char)~glyph[i];
       }
       glyph_plot(cursorCol, cursorRow, inv, TERM_TEXT_COLOR);
     } else {
@@ -158,7 +160,7 @@ static void textPutcRaw(char character) {
         cursorRow = 0;
       }
     } else {
-      cursorCol = (uint16_t)(SCR_WIDTH_CHARS - 1U);
+      cursorCol = (unsigned short)(SCR_WIDTH_CHARS - 1U);
     }
   }
 
@@ -166,30 +168,30 @@ static void textPutcRaw(char character) {
   TERM_CURSOR_ROW = cursorRow;
 }
 
-static void textVt52DirectCursor(uint8_t rowCode, uint8_t colCode) {
-  uint16_t row = 0;
-  uint16_t col = 0;
+static void textVt52DirectCursor(unsigned char rowCode, unsigned char colCode) {
+  unsigned short row = 0;
+  unsigned short col = 0;
 
   if (rowCode >= kVt52CoordBias) {
-    row = (uint16_t)(rowCode - kVt52CoordBias);
+    row = (unsigned short)(rowCode - kVt52CoordBias);
   }
   if (colCode >= kVt52CoordBias) {
-    col = (uint16_t)(colCode - kVt52CoordBias);
+    col = (unsigned short)(colCode - kVt52CoordBias);
   }
 
   if (row >= SCR_HEIGHT_LINES) {
-    row = (uint16_t)(SCR_HEIGHT_LINES - 1U);
+    row = (unsigned short)(SCR_HEIGHT_LINES - 1U);
   }
   if (col >= SCR_WIDTH_CHARS) {
-    col = (uint16_t)(SCR_WIDTH_CHARS - 1U);
+    col = (unsigned short)(SCR_WIDTH_CHARS - 1U);
   }
 
   text_set_cursor(col, row);
 }
 
-static void textVt52Exec(uint8_t cmd) {
-  uint16_t row = TERM_CURSOR_ROW;
-  uint16_t col = TERM_CURSOR_COL;
+static void textVt52Exec(unsigned char cmd) {
+  unsigned short row = TERM_CURSOR_ROW;
+  unsigned short col = TERM_CURSOR_COL;
 
   switch (cmd) {
     case 'A': /* cursor up */
@@ -273,23 +275,23 @@ static void textVt52Exec(uint8_t cmd) {
   }
 }
 
-void text_set_cursor(uint16_t col, uint16_t row) {
+void text_set_cursor(unsigned short col, unsigned short row) {
   if (col >= SCR_WIDTH_CHARS) col = 0;
   if (row >= SCR_HEIGHT_LINES) row = 0;
   TERM_CURSOR_COL = col;
   TERM_CURSOR_ROW = row;
 }
 
-void text_set_color(uint8_t color) {
-  TERM_TEXT_COLOR = (uint8_t)(color & 0x03U);
+void text_set_color(unsigned char color) {
+  TERM_TEXT_COLOR = (unsigned char)(color & 0x03U);
 }
 
 void text_clear(void) {
   gVt52State = VT52_STATE_IDLE;
   gVt52Reverse = 0U;
   text_set_cursor(0, 0);
-  for (uint16_t row = 0; row < SCR_HEIGHT_LINES; ++row) {
-    for (uint16_t col = 0; col < SCR_WIDTH_CHARS; ++col) {
+  for (unsigned short row = 0; row < SCR_HEIGHT_LINES; ++row) {
+    for (unsigned short col = 0; col < SCR_WIDTH_CHARS; ++col) {
       textPutcRaw(' ');
     }
   }
@@ -302,11 +304,11 @@ void text_init(void) {
 }
 
 void text_putc(char character) {
-  const uint8_t inputCode = (uint8_t)character;
+  const unsigned char inputCode = (unsigned char)character;
 
   if (gVt52State == VT52_STATE_B_VAL) {
     gVt52State = VT52_STATE_IDLE;
-    text_set_color((uint8_t)(inputCode & 0x03U));
+    text_set_color((unsigned char)(inputCode & 0x03U));
     return;
   }
 
@@ -317,15 +319,15 @@ void text_putc(char character) {
 
   if (gVt52State == VT52_STATE_ESC) {
     gVt52State = VT52_STATE_IDLE;
-    if (inputCode == (uint8_t)'Y') {
+    if (inputCode == (unsigned char)'Y') {
       gVt52State = VT52_STATE_Y_ROW;
       return;
     }
-    if (inputCode == (uint8_t)'b') {
+    if (inputCode == (unsigned char)'b') {
       gVt52State = VT52_STATE_B_VAL;
       return;
     }
-    if (inputCode == (uint8_t)'c') {
+    if (inputCode == (unsigned char)'c') {
       /* Not implemented by request: consume one parameter byte. */
       gVt52State = VT52_STATE_SKIP_1;
       return;
@@ -358,13 +360,13 @@ void text_putc(char character) {
 
   if (inputCode == '\b') {
     if (TERM_CURSOR_COL > 0U) {
-      text_set_cursor((uint16_t)(TERM_CURSOR_COL - 1U), TERM_CURSOR_ROW);
+      text_set_cursor((unsigned short)(TERM_CURSOR_COL - 1U), TERM_CURSOR_ROW);
     }
     return;
   }
 
   if (inputCode == '\t') {
-    uint8_t spaces = (uint8_t)(kTabWidth - (TERM_CURSOR_COL & kTabMask));
+    unsigned char spaces = (unsigned char)(kTabWidth - (TERM_CURSOR_COL & kTabMask));
     while (spaces--) {
       textPutcRaw(' ');
     }
@@ -380,38 +382,38 @@ void text_puts(const char *text) {
   }
 }
 
-static void textEmitRepeat(char character, uint32_t count, int *written) {
+static void textEmitRepeat(char character, unsigned long count, int *written) {
   while (count--) {
     text_putc(character);
     (*written)++;
   }
 }
 
-static uint32_t textStrlenLocal(const char *text) {
-  uint32_t len = 0;
+static unsigned long textStrlenLocal(const char *text) {
+  unsigned long len = 0;
   while (text[len]) {
     len++;
   }
   return len;
 }
 
-static void textEmitSpan(const char *text, uint32_t len, int *written) {
-  for (uint32_t i = 0; i < len; ++i) {
+static void textEmitSpan(const char *text, unsigned long len, int *written) {
+  for (unsigned long i = 0; i < len; ++i) {
     text_putc(text[i]);
   }
   *written += (int)len;
 }
 
-static uint32_t u32ToDec(uint32_t value, char *out) {
-  static const uint32_t kPow10[] = {
+static unsigned long u32ToDec(unsigned long value, char *out) {
+  static const unsigned long kPow10[] = {
       1000000000U, 100000000U, 10000000U, 1000000U, 100000U,
       10000U,      1000U,      100U,      10U,      1U};
-  uint32_t len = 0;
-  uint8_t started = 0;
+  unsigned long len = 0;
+  unsigned char started = 0;
 
-  for (uint32_t i = 0; i < (uint32_t)(sizeof(kPow10) / sizeof(kPow10[0]));
+  for (unsigned long i = 0; i < (unsigned long)(sizeof(kPow10) / sizeof(kPow10[0]));
        ++i) {
-    uint32_t digit = 0;
+    unsigned long digit = 0;
     while (value >= kPow10[i]) {
       value -= kPow10[i];
       digit++;
@@ -425,13 +427,13 @@ static uint32_t u32ToDec(uint32_t value, char *out) {
   return len;
 }
 
-static uint32_t u32ToHex(uint32_t value, char *out, uint8_t uppercase) {
-  uint32_t len = 0;
-  uint8_t started = 0;
+static unsigned long u32ToHex(unsigned long value, char *out, unsigned char uppercase) {
+  unsigned long len = 0;
+  unsigned char started = 0;
   const char hexBaseChar = uppercase ? 'A' : 'a';
 
   for (int shift = kHexShiftStart; shift >= 0; shift -= kNibbleBitCount) {
-    uint8_t nibble = (uint8_t)((value >> (uint32_t)shift) & kHexNibbleMask);
+    unsigned char nibble = (unsigned char)((value >> (unsigned long)shift) & kHexNibbleMask);
     if (started || nibble || shift == 0) {
       if (nibble < kDecimalRadix) {
         out[len++] = (char)('0' + (char)nibble);
@@ -445,14 +447,14 @@ static uint32_t u32ToHex(uint32_t value, char *out, uint8_t uppercase) {
   return len;
 }
 
-static uint32_t uptrToHex(uintptr_t value, char *out) {
-  uint32_t len = 0;
-  uint8_t started = 0;
+static unsigned long uptrToHex(unsigned long value, char *out) {
+  unsigned long len = 0;
+  unsigned char started = 0;
 
-  for (int shift = (int)(sizeof(uintptr_t) * CHAR_BIT - kNibbleBitCount);
+  for (int shift = (int)(sizeof(unsigned long) * kCharBitCount - kNibbleBitCount);
        shift >= 0; shift -= kNibbleBitCount) {
-    uint8_t nibble =
-        (uint8_t)((value >> (uint32_t)shift) & (uintptr_t)kHexNibbleMask);
+    unsigned char nibble =
+        (unsigned char)((value >> (unsigned long)shift) & (unsigned long)kHexNibbleMask);
     if (started || nibble || shift == 0) {
       if (nibble < kDecimalRadix) {
         out[len++] = (char)('0' + (char)nibble);
@@ -466,16 +468,16 @@ static uint32_t uptrToHex(uintptr_t value, char *out) {
   return len;
 }
 
-static void textEmitFormattedNumber(const char *prefix, uint32_t prefixLen,
-                                    const char *digits, uint32_t digitsLen,
-                                    int width, int precision, uint8_t leftAlign,
-                                    uint8_t zeroPad, int *written) {
-  uint32_t zeroCount = 0;
-  uint32_t fieldLen;
-  uint32_t padCount;
+static void textEmitFormattedNumber(const char *prefix, unsigned long prefixLen,
+                                    const char *digits, unsigned long digitsLen,
+                                    int width, int precision, unsigned char leftAlign,
+                                    unsigned char zeroPad, int *written) {
+  unsigned long zeroCount = 0;
+  unsigned long fieldLen;
+  unsigned long padCount;
 
   if (precision >= 0) {
-    uint32_t precisionValue = (uint32_t)precision;
+    unsigned long precisionValue = (unsigned long)precision;
     if (digitsLen < precisionValue) {
       zeroCount = precisionValue - digitsLen;
     }
@@ -483,8 +485,8 @@ static void textEmitFormattedNumber(const char *prefix, uint32_t prefixLen,
 
   fieldLen = prefixLen + zeroCount + digitsLen;
   padCount = 0;
-  if (width > 0 && (uint32_t)width > fieldLen) {
-    padCount = (uint32_t)width - fieldLen;
+  if (width > 0 && (unsigned long)width > fieldLen) {
+    padCount = (unsigned long)width - fieldLen;
   }
 
   if (!leftAlign) {
@@ -529,19 +531,19 @@ int text_printf(const char *fmt, ...) {
     }
 
     {
-      uint8_t leftAlign = 0;
-      uint8_t plusSign = 0;
-      uint8_t spaceSign = 0;
-      uint8_t alt = 0;
-      uint8_t zeroPad = 0;
+      unsigned char leftAlign = 0;
+      unsigned char plusSign = 0;
+      unsigned char spaceSign = 0;
+      unsigned char alt = 0;
+      unsigned char zeroPad = 0;
       int width = 0;
       int precision = -1;
-      uint8_t longArg = 0;
+      unsigned char longArg = 0;
       char spec;
       char digits[kDigitsBufferSize];
-      uint32_t digitsLen = 0;
+      unsigned long digitsLen = 0;
       char prefix[3];
-      uint32_t prefixLen = 0;
+      unsigned long prefixLen = 0;
 
       /* flags */
       while (*fmt == '-' || *fmt == '+' || *fmt == ' ' || *fmt == '#' ||
@@ -589,9 +591,9 @@ int text_printf(const char *fmt, ...) {
 
       if (spec == 'c') {
         char outputChar = (char)va_arg(argList, int);
-        uint32_t pad = 0;
+        unsigned long pad = 0;
         if (width > 1) {
-          pad = (uint32_t)(width - 1);
+          pad = (unsigned long)(width - 1);
         }
         if (!leftAlign) {
           textEmitRepeat(' ', pad, &written);
@@ -606,19 +608,19 @@ int text_printf(const char *fmt, ...) {
 
       if (spec == 's') {
         const char *strArg = va_arg(argList, const char *);
-        uint32_t len;
-        uint32_t outLen;
-        uint32_t pad = 0;
+        unsigned long len;
+        unsigned long outLen;
+        unsigned long pad = 0;
         if (!strArg) {
           strArg = "(null)";
         }
         len = textStrlenLocal(strArg);
         outLen = len;
-        if (precision >= 0 && outLen > (uint32_t)precision) {
-          outLen = (uint32_t)precision;
+        if (precision >= 0 && outLen > (unsigned long)precision) {
+          outLen = (unsigned long)precision;
         }
-        if (width > 0 && (uint32_t)width > outLen) {
-          pad = (uint32_t)width - outLen;
+        if (width > 0 && (unsigned long)width > outLen) {
+          pad = (unsigned long)width - outLen;
         }
         if (!leftAlign) {
           textEmitRepeat(' ', pad, &written);
@@ -631,9 +633,9 @@ int text_printf(const char *fmt, ...) {
       }
 
       if (spec == 'd' || spec == 'i') {
-        int32_t signedValue = longArg ? (int32_t)va_arg(argList, long)
-                                      : (int32_t)va_arg(argList, int);
-        uint32_t magnitude = (uint32_t)signedValue;
+        signed long signedValue = longArg ? (signed long)va_arg(argList, long)
+                                      : (signed long)va_arg(argList, int);
+        unsigned long magnitude = (unsigned long)signedValue;
         if (signedValue < 0) {
           prefix[prefixLen++] = '-';
           magnitude = (~magnitude) + 1U;
@@ -652,13 +654,13 @@ int text_printf(const char *fmt, ...) {
       }
 
       if (spec == 'u' || spec == 'x' || spec == 'X') {
-        uint32_t unsignedValue = longArg
-                                     ? (uint32_t)va_arg(argList, unsigned long)
-                                     : (uint32_t)va_arg(argList, unsigned int);
+        unsigned long unsignedValue = longArg
+                                     ? (unsigned long)va_arg(argList, unsigned long)
+                                     : (unsigned long)va_arg(argList, unsigned int);
         if (spec == 'u') {
           digitsLen = u32ToDec(unsignedValue, digits);
         } else {
-          digitsLen = u32ToHex(unsignedValue, digits, (uint8_t)(spec == 'X'));
+          digitsLen = u32ToHex(unsignedValue, digits, (unsigned char)(spec == 'X'));
           if (alt && unsignedValue != 0U) {
             prefix[prefixLen++] = '0';
             prefix[prefixLen++] = (char)((spec == 'X') ? 'X' : 'x');
@@ -673,7 +675,7 @@ int text_printf(const char *fmt, ...) {
       }
 
       if (spec == 'p') {
-        uintptr_t pointerValue = (uintptr_t)va_arg(argList, void *);
+        unsigned long pointerValue = (unsigned long)va_arg(argList, void *);
         prefix[prefixLen++] = '0';
         prefix[prefixLen++] = 'x';
         digitsLen = uptrToHex(pointerValue, digits);
