@@ -16,8 +16,6 @@ platforms, sharing the same hardware abstraction layer.
   image so the toolchain lives in a container (`stcmd`).
 - Pure C + 68k assembly. No GEMDOS/BIOS/XBIOS calls – everything goes straight
   through hardware registers.
-- Plug-in hardware layer (`src/common/romemul_hw.h`) so the actual register map
-  or handshake sequence can be adjusted without touching the rest of the code.
 - Minimal on-screen feedback implemented via a custom text renderer using
   the public-domain font8x8 dataset (basic ASCII).
 
@@ -83,14 +81,6 @@ make check
 ```
 
 All targets are implemented through `scripts/clang-checks.sh`.
-
-## Configuring the hardware layer
-
-`src/common/romemul_hw.h` contains placeholder addresses for the ROM Emulator
-control registers. Update the base address and handshake bits so they match the
-actual hardware (SidecarTridge ROM Emulator, Croissant, etc.). The ST sample
-writes the bank index to `ROMEMUL_BANK_SELECT` and polls the ready bit to ensure
-that bus latched before continuing.
 
 ## Roadmap
 
