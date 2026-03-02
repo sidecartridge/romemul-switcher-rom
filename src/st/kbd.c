@@ -26,19 +26,19 @@ enum {
 };
 
 struct st_acia_interface {
-  volatile uint8_t control; /* read=status, write=control */
-  volatile uint8_t dummy1;
-  volatile uint8_t data;
-  volatile uint8_t dummy2;
+  volatile unsigned char control; /* read=status, write=control */
+  volatile unsigned char dummy1;
+  volatile unsigned char data;
+  volatile unsigned char dummy2;
 };
 
 #define ST_IKBD_ACIA \
-  (*(volatile struct st_acia_interface *)(uintptr_t)kAciaBaseAddr)
+  (*(volatile struct st_acia_interface *)(unsigned long)kAciaBaseAddr)
 
-static uint8_t kbdAciaInitialized = 0U;
-static uint8_t kbdDropBytes = 0U;
+static unsigned char kbdAciaInitialized = 0U;
+static unsigned char kbdDropBytes = 0U;
 
-static void kbdWriteByte(uint8_t value) {
+static void kbdWriteByte(unsigned char value) {
   while (!(ST_IKBD_ACIA.control & kIkbdStatusTxEmpty)) {
     /* wait for TX data register empty */
   }
@@ -68,18 +68,18 @@ static void kbdAciaInit(void) {
   kbdAciaInitialized = 1U;
 }
 
-static void kbdDelay(uint32_t loops) {
+static void kbdDelay(unsigned long loops) {
   while (loops--) {
     __asm__ volatile("nop\n nop\n" ::: "memory");
   }
 }
 
-uint8_t kbd_poll_scancode(void) {
+unsigned char kbd_poll_scancode(void) {
   kbdAciaInit();
 
   for (;;) {
-    uint8_t status;
-    uint8_t data;
+    unsigned char status;
+    unsigned char data;
 
     /*
      * MC6850 access sequence: read STATUS first, then DATA when RDRF=1.
@@ -134,15 +134,20 @@ uint8_t kbd_poll_scancode(void) {
   }
 }
 
-void kbd_wait_for_key_press(void) {
+unsigned char kbd_poll_scancode_wait(void) {
   for (;;) {
-    uint8_t scan = kbd_poll_scancode();
+    unsigned char scan = kbd_poll_scancode();
     if (scan == kInvalidScancode) {
       kbdDelay(kPollDelayLoops);
       continue;
     }
-    if (!(scan & kKeyReleaseMask)) {
-      return;
+    if (scan & kKeyReleaseMask) {
+      continue;
     }
+    return scan;
   }
+}
+
+void kbd_wait_for_key_press(void) {
+  (void)kbd_poll_scancode_wait();
 }
