@@ -3,6 +3,10 @@
 #include "../st/glyph.h"
 #include "../st/term.h"
 
+#ifndef APP_VERSION_STR
+#define APP_VERSION_STR "0.0.0"
+#endif
+
 typedef __builtin_va_list va_list;
 #define va_start __builtin_va_start
 #define va_end __builtin_va_end
@@ -67,8 +71,8 @@ static void textCopyRow(unsigned short dstRow, unsigned short srcRow) {
 
 static void textInsertLineAtCursor(void) {
   const unsigned short row = TERM_CURSOR_ROW;
-  for (unsigned short rowIter = (unsigned short)(SCR_HEIGHT_LINES - 1U); rowIter > row;
-       --rowIter) {
+  for (unsigned short rowIter = (unsigned short)(SCR_HEIGHT_LINES - 1U);
+       rowIter > row; --rowIter) {
     textCopyRow(rowIter, (unsigned short)(rowIter - 1U));
   }
   textClearRow(row);
@@ -76,7 +80,8 @@ static void textInsertLineAtCursor(void) {
 
 static void textDeleteLineAtCursor(void) {
   const unsigned short row = TERM_CURSOR_ROW;
-  for (unsigned short rowIter = row; rowIter + 1U < SCR_HEIGHT_LINES; ++rowIter) {
+  for (unsigned short rowIter = row; rowIter + 1U < SCR_HEIGHT_LINES;
+       ++rowIter) {
     textCopyRow(rowIter, (unsigned short)(rowIter + 1U));
   }
   textClearRow((unsigned short)(SCR_HEIGHT_LINES - 1U));
@@ -289,13 +294,13 @@ void text_set_color(unsigned char color) {
 void text_clear(void) {
   gVt52State = VT52_STATE_IDLE;
   gVt52Reverse = 0U;
-  text_set_cursor(0, 0);
+  text_set_cursor(0U, 0U);
   for (unsigned short row = 0; row < SCR_HEIGHT_LINES; ++row) {
     for (unsigned short col = 0; col < SCR_WIDTH_CHARS; ++col) {
-      textPutcRaw(' ');
+      textPutSpaceAt(col, row);
     }
   }
-  text_set_cursor(0, 0);
+  text_set_cursor(0U, 0U);
 }
 
 void text_init(void) {
@@ -366,7 +371,8 @@ void text_putc(char character) {
   }
 
   if (inputCode == '\t') {
-    unsigned char spaces = (unsigned char)(kTabWidth - (TERM_CURSOR_COL & kTabMask));
+    unsigned char spaces =
+        (unsigned char)(kTabWidth - (TERM_CURSOR_COL & kTabMask));
     while (spaces--) {
       textPutcRaw(' ');
     }
@@ -379,6 +385,61 @@ void text_putc(char character) {
 void text_puts(const char *text) {
   while (*text) {
     text_putc(*text++);
+  }
+}
+
+void text_build_title_line(char out[SCR_WIDTH_CHARS + 1],
+                           const char *computer_model) {
+  static const char kPrefix[] = "SidecarTridge ";
+  static const char kSuffix[] = " Rescue Switcher - v" APP_VERSION_STR;
+  unsigned short totalLen = 0U;
+  unsigned short leftPad = 0U;
+  unsigned short i = 0U;
+  unsigned short pos = 0U;
+
+  if (computer_model == (const char *)0) {
+    computer_model = "";
+  }
+
+  for (i = 0U; i < SCR_WIDTH_CHARS; ++i) {
+    out[i] = ' ';
+  }
+  out[SCR_WIDTH_CHARS] = '\0';
+
+  i = 0U;
+  while (kPrefix[i] != '\0' && totalLen < SCR_WIDTH_CHARS) {
+    ++totalLen;
+    ++i;
+  }
+
+  i = 0U;
+  while (computer_model[i] != '\0' && totalLen < SCR_WIDTH_CHARS) {
+    ++totalLen;
+    ++i;
+  }
+
+  i = 0U;
+  while (kSuffix[i] != '\0' && totalLen < SCR_WIDTH_CHARS) {
+    ++totalLen;
+    ++i;
+  }
+
+  if (totalLen < SCR_WIDTH_CHARS) {
+    leftPad = (unsigned short)((SCR_WIDTH_CHARS - totalLen) / 2U);
+  }
+  pos = leftPad;
+
+  i = 0U;
+  while (kPrefix[i] != '\0' && pos < SCR_WIDTH_CHARS) {
+    out[pos++] = kPrefix[i++];
+  }
+  i = 0U;
+  while (computer_model[i] != '\0' && pos < SCR_WIDTH_CHARS) {
+    out[pos++] = computer_model[i++];
+  }
+  i = 0U;
+  while (kSuffix[i] != '\0' && pos < SCR_WIDTH_CHARS) {
+    out[pos++] = kSuffix[i++];
   }
 }
 
@@ -411,8 +472,8 @@ static unsigned long u32ToDec(unsigned long value, char *out) {
   unsigned long len = 0;
   unsigned char started = 0;
 
-  for (unsigned long i = 0; i < (unsigned long)(sizeof(kPow10) / sizeof(kPow10[0]));
-       ++i) {
+  for (unsigned long i = 0;
+       i < (unsigned long)(sizeof(kPow10) / sizeof(kPow10[0])); ++i) {
     unsigned long digit = 0;
     while (value >= kPow10[i]) {
       value -= kPow10[i];
@@ -427,13 +488,15 @@ static unsigned long u32ToDec(unsigned long value, char *out) {
   return len;
 }
 
-static unsigned long u32ToHex(unsigned long value, char *out, unsigned char uppercase) {
+static unsigned long u32ToHex(unsigned long value, char *out,
+                              unsigned char uppercase) {
   unsigned long len = 0;
   unsigned char started = 0;
   const char hexBaseChar = uppercase ? 'A' : 'a';
 
   for (int shift = kHexShiftStart; shift >= 0; shift -= kNibbleBitCount) {
-    unsigned char nibble = (unsigned char)((value >> (unsigned long)shift) & kHexNibbleMask);
+    unsigned char nibble =
+        (unsigned char)((value >> (unsigned long)shift) & kHexNibbleMask);
     if (started || nibble || shift == 0) {
       if (nibble < kDecimalRadix) {
         out[len++] = (char)('0' + (char)nibble);
@@ -451,10 +514,11 @@ static unsigned long uptrToHex(unsigned long value, char *out) {
   unsigned long len = 0;
   unsigned char started = 0;
 
-  for (int shift = (int)(sizeof(unsigned long) * kCharBitCount - kNibbleBitCount);
+  for (int shift =
+           (int)(sizeof(unsigned long) * kCharBitCount - kNibbleBitCount);
        shift >= 0; shift -= kNibbleBitCount) {
-    unsigned char nibble =
-        (unsigned char)((value >> (unsigned long)shift) & (unsigned long)kHexNibbleMask);
+    unsigned char nibble = (unsigned char)((value >> (unsigned long)shift) &
+                                           (unsigned long)kHexNibbleMask);
     if (started || nibble || shift == 0) {
       if (nibble < kDecimalRadix) {
         out[len++] = (char)('0' + (char)nibble);
@@ -470,7 +534,8 @@ static unsigned long uptrToHex(unsigned long value, char *out) {
 
 static void textEmitFormattedNumber(const char *prefix, unsigned long prefixLen,
                                     const char *digits, unsigned long digitsLen,
-                                    int width, int precision, unsigned char leftAlign,
+                                    int width, int precision,
+                                    unsigned char leftAlign,
                                     unsigned char zeroPad, int *written) {
   unsigned long zeroCount = 0;
   unsigned long fieldLen;
@@ -507,6 +572,24 @@ static void textEmitFormattedNumber(const char *prefix, unsigned long prefixLen,
   if (leftAlign) {
     textEmitRepeat(' ', padCount, written);
   }
+}
+
+static unsigned short textExpectU8(unsigned char expected,
+                                   unsigned char actual) {
+  return (unsigned short)((expected == actual) ? 0U : 1U);
+}
+
+static unsigned short textExpectU16(unsigned short expected,
+                                    unsigned short actual) {
+  return (unsigned short)((expected == actual) ? 0U : 1U);
+}
+
+static void textReportCheck(const char *label, unsigned short checkFailures,
+                            unsigned short *failures) {
+  *failures = (unsigned short)(*failures + checkFailures);
+  text_set_color((unsigned char)(checkFailures ? 2U : 1U));
+  text_printf("%s: %s\r\n", label, checkFailures ? "FAIL" : "PASS");
+  text_set_color(1U);
 }
 
 int text_printf(const char *fmt, ...) {
@@ -634,7 +717,7 @@ int text_printf(const char *fmt, ...) {
 
       if (spec == 'd' || spec == 'i') {
         signed long signedValue = longArg ? (signed long)va_arg(argList, long)
-                                      : (signed long)va_arg(argList, int);
+                                          : (signed long)va_arg(argList, int);
         unsigned long magnitude = (unsigned long)signedValue;
         if (signedValue < 0) {
           prefix[prefixLen++] = '-';
@@ -654,13 +737,14 @@ int text_printf(const char *fmt, ...) {
       }
 
       if (spec == 'u' || spec == 'x' || spec == 'X') {
-        unsigned long unsignedValue = longArg
-                                     ? (unsigned long)va_arg(argList, unsigned long)
-                                     : (unsigned long)va_arg(argList, unsigned int);
+        unsigned long unsignedValue =
+            longArg ? (unsigned long)va_arg(argList, unsigned long)
+                    : (unsigned long)va_arg(argList, unsigned int);
         if (spec == 'u') {
           digitsLen = u32ToDec(unsignedValue, digits);
         } else {
-          digitsLen = u32ToHex(unsignedValue, digits, (unsigned char)(spec == 'X'));
+          digitsLen =
+              u32ToHex(unsignedValue, digits, (unsigned char)(spec == 'X'));
           if (alt && unsignedValue != 0U) {
             prefix[prefixLen++] = '0';
             prefix[prefixLen++] = (char)((spec == 'X') ? 'X' : 'x');
@@ -696,4 +780,146 @@ int text_printf(const char *fmt, ...) {
 
   va_end(argList);
   return written;
+}
+
+unsigned short text_run_feature_tests(void) {
+  unsigned short failures = 0U;
+  unsigned short checkFailures = 0U;
+
+  text_clear();
+  text_set_color(1U);
+  text_printf("TEXT VISUAL TESTS (text.c/text.h)\r\n");
+  text_printf("=================================\r\n");
+
+  text_printf("\r\n[1] Different colors\r\n");
+  text_set_color(0U);
+  text_printf("Color 0 sample text\r\n");
+  text_set_color(1U);
+  text_printf("Color 1 sample text\r\n");
+  text_set_color(2U);
+  text_printf("Color 2 sample text\r\n");
+  text_set_color(3U);
+  text_printf("Color 3 sample text\r\n");
+
+  checkFailures = 0U;
+  text_set_color(0U);
+  checkFailures += textExpectU8(0U, TERM_TEXT_COLOR);
+  text_set_color(1U);
+  checkFailures += textExpectU8(1U, TERM_TEXT_COLOR);
+  text_set_color(2U);
+  checkFailures += textExpectU8(2U, TERM_TEXT_COLOR);
+  text_set_color(3U);
+  checkFailures += textExpectU8(3U, TERM_TEXT_COLOR);
+  text_set_color(7U);
+  checkFailures += textExpectU8(3U, TERM_TEXT_COLOR);
+  text_set_color(1U);
+  textReportCheck("Color API (0..3 + mask)", checkFailures, &failures);
+
+  text_putc((char)kEscCode);
+  text_putc('b');
+  text_putc((char)2);
+  checkFailures = textExpectU8(2U, TERM_TEXT_COLOR);
+  text_set_color(1U);
+  textReportCheck("ESC b n set color", checkFailures, &failures);
+
+  text_printf("\r\n[2] Different screen cursor position\r\n");
+  text_set_cursor(10U, 16U);
+  text_putc('A');
+  text_set_cursor(25U, 16U);
+  text_putc('B');
+  text_set_cursor(0U, 17U);
+  text_printf("Visual: 'A' at (10,16) and 'B' at (25,16)\r\n");
+
+  text_set_cursor(10U, 5U);
+  checkFailures = (unsigned short)(textExpectU16(10U, TERM_CURSOR_COL) +
+                                   textExpectU16(5U, TERM_CURSOR_ROW));
+  textReportCheck("Cursor set/get", checkFailures, &failures);
+
+  text_set_cursor(SCR_WIDTH_CHARS, SCR_HEIGHT_LINES);
+  checkFailures = (unsigned short)(textExpectU16(0U, TERM_CURSOR_COL) +
+                                   textExpectU16(0U, TERM_CURSOR_ROW));
+  textReportCheck("Cursor out-of-range clamp", checkFailures, &failures);
+
+  text_putc((char)kEscCode);
+  text_putc('Y');
+  text_putc((char)(kVt52CoordBias + 7U));
+  text_putc((char)(kVt52CoordBias + 11U));
+  checkFailures = (unsigned short)(textExpectU16(11U, TERM_CURSOR_COL) +
+                                   textExpectU16(7U, TERM_CURSOR_ROW));
+  textReportCheck("ESC Y direct cursor", checkFailures, &failures);
+
+  text_printf("\r\n[3] Different ESC codes\r\n");
+  text_set_cursor(1U, 1U);
+  text_putc((char)kEscCode);
+  text_putc('A');
+  text_putc((char)kEscCode);
+  text_putc('B');
+  text_putc((char)kEscCode);
+  text_putc('C');
+  text_putc((char)kEscCode);
+  text_putc('D');
+  checkFailures = (unsigned short)(textExpectU16(1U, TERM_CURSOR_COL) +
+                                   textExpectU16(1U, TERM_CURSOR_ROW));
+  text_set_cursor(0U, 21U);
+  textReportCheck("ESC A/B/C/D movement", checkFailures, &failures);
+
+  text_set_cursor(12U, 9U);
+  text_putc((char)kEscCode);
+  text_putc('j');
+  text_set_cursor(2U, 3U);
+  text_putc((char)kEscCode);
+  text_putc('k');
+  checkFailures = (unsigned short)(textExpectU16(12U, TERM_CURSOR_COL) +
+                                   textExpectU16(9U, TERM_CURSOR_ROW));
+  textReportCheck("ESC j/k save+restore", checkFailures, &failures);
+
+  text_putc((char)kEscCode);
+  text_putc('p');
+  checkFailures = textExpectU8(1U, gVt52Reverse);
+  text_putc((char)kEscCode);
+  text_putc('q');
+  checkFailures =
+      (unsigned short)(checkFailures + textExpectU8(0U, gVt52Reverse));
+  textReportCheck("ESC p/q reverse toggle", checkFailures, &failures);
+
+  text_putc((char)kEscCode);
+  text_putc('w');
+  text_set_cursor((unsigned short)(SCR_WIDTH_CHARS - 1U), 0U);
+  text_putc('X');
+  checkFailures =
+      (unsigned short)(textExpectU16((unsigned short)(SCR_WIDTH_CHARS - 1U),
+                                     TERM_CURSOR_COL) +
+                       textExpectU16(0U, TERM_CURSOR_ROW));
+  text_putc((char)kEscCode);
+  text_putc('v');
+  text_set_cursor((unsigned short)(SCR_WIDTH_CHARS - 1U), 0U);
+  text_putc('Y');
+  checkFailures =
+      (unsigned short)(checkFailures + textExpectU16(0U, TERM_CURSOR_COL) +
+                       textExpectU16(1U, TERM_CURSOR_ROW));
+  textReportCheck("ESC v/w wrap on/off", checkFailures, &failures);
+
+  text_set_cursor(5U, 4U);
+  text_set_color(1U);
+  text_putc((char)kEscCode);
+  text_putc('c');
+  text_putc((char)3);
+  checkFailures = (unsigned short)(textExpectU16(5U, TERM_CURSOR_COL) +
+                                   textExpectU16(4U, TERM_CURSOR_ROW) +
+                                   textExpectU8(1U, TERM_TEXT_COLOR));
+  textReportCheck("ESC c n consume parameter", checkFailures, &failures);
+
+  text_set_cursor(6U, 4U);
+  text_putc((char)kEscCode);
+  text_putc('H');
+  checkFailures = (unsigned short)(textExpectU16(0U, TERM_CURSOR_COL) +
+                                   textExpectU16(0U, TERM_CURSOR_ROW));
+  textReportCheck("ESC H home", checkFailures, &failures);
+
+  text_set_cursor(0U, (unsigned short)(SCR_HEIGHT_LINES - 1U));
+  text_putc((char)kEscCode);
+  text_putc('l');
+  text_set_cursor(0U, (unsigned short)(SCR_HEIGHT_LINES - 1U));
+  text_printf("Summary: failures=%u (0 means PASS)", (unsigned int)failures);
+  return failures;
 }
