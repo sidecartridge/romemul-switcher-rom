@@ -6,9 +6,8 @@ runs directly on the target machine and toggles ROM banks by writing to the
 hardware control registers. The code base targets both Atari ST and Amiga
 platforms, sharing the same hardware abstraction layer.
 
-> **Status:** early scaffold. The Atari ST target builds and exercises the bank
-> switching flow; the Amiga target is stubbed and will receive code parity once
-> the register map is finalized.
+> **Status:** Atari ST/STE builds are active. Amiga build is temporarily
+> disabled and returns `not implemented yet`.
 
 ## Highlights
 
@@ -30,8 +29,8 @@ romemul-switcher-rom/
 │   ├── common/           # shared hardware abstraction headers
 │   └── st/               # Atari ST startup + ROM switcher logic
 │       ├── Makefile      # invoked inside the container
-│       ├── rom_switcher.c
-│       ├── rom_switcher.h
+│       ├── switcher.c
+│       ├── switcher.h
 │       └── start.s
 └── build/                # generated artefacts (gitignored)
 ```
@@ -43,23 +42,42 @@ romemul-switcher-rom/
    [`atarist-toolkit-docker` installer](https://github.com/sidecartridge/atarist-toolkit-docker/releases/latest).
 3. macOS, Linux, or WSL2 host shell.
 
-## Building (Atari ST)
+## Building
 
 ```bash
 # Ensure stcmd is on your PATH
 which stcmd
 
-# Run the top-level make. This will invoke `stcmd make -C src/st`.
-make st
+# Platform is mandatory: st | ste | amiga
+./build.sh st
+./build.sh ste
 
-# Artefacts
-ls build/st
-# ROMSWITC.PRG  ROMSWITC.BIN  ROMSWITC.MAP
+# Optional modes
+./build.sh ste debug
+./build.sh ste test
+./build.sh ste debug test
 ```
 
-`ROMSWITC.PRG` keeps the TOS headers so the binary can be executed from
-RAM while iterating. `ROMSWITC.BIN` is a flat image that can be burned
-into ROM.
+Platform behavior:
+- `st`: builds with `ROM_BASE_ADDR_UL=0x00FC0000UL` and `startup_st.s`.
+- `ste`: builds with `ROM_BASE_ADDR_UL=0x00E00000UL` and `startup_ste.s`.
+- `amiga`: currently exits with `amiga build is not implemented yet`.
+
+Release artefacts are copied to `dist/<platform>/` (only when `test` is not enabled):
+- ST:
+  - `RSWIT192.PRG`
+  - `RESCUE_SWITCHER_v<version>_192KB.img`
+- STE:
+  - `RSWIT256.PRG`
+  - `RESCUE_SWITCHER_v<version>_256KB.img`
+
+The generated `.img` file is padded with zeroes up to the next 4KB boundary.
+
+Notes:
+- Internal build outputs remain in `build/st/` with canonical names
+  (`ROMSWITC.PRG`, `ROMSWITC.BIN`, maps, and `RESCUE_SWITCHER_v<version>.img`).
+- `ROM_BASE_ADDR_UL` has no default in Makefiles and must be passed by the
+  calling script (`build.sh` does this automatically).
 
 ## Code style checks
 

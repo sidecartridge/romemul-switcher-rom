@@ -2,9 +2,23 @@
 
 DEBUG ?= 0
 TEST ?= 0
+STARTUP_ROM_ASM ?= startup_ste.s
+
+NEED_ROM_BASE_ADDR := 0
+ifeq ($(strip $(MAKECMDGOALS)),)
+NEED_ROM_BASE_ADDR := 1
+endif
+ifneq ($(filter st debug test,$(MAKECMDGOALS)),)
+NEED_ROM_BASE_ADDR := 1
+endif
+ifeq ($(NEED_ROM_BASE_ADDR),1)
+ifndef ROM_BASE_ADDR_UL
+$(error ROM_BASE_ADDR_UL is required. Use ./build.sh [st|ste] or pass ROM_BASE_ADDR_UL=0x00E00000UL)
+endif
+endif
 
 st:
-	make -C src/st DEBUG=$(DEBUG) TEST=$(TEST)
+	$(MAKE) -C src/st DEBUG=$(DEBUG) TEST=$(TEST) ROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL) STARTUP_ROM_ASM=$(STARTUP_ROM_ASM)
 
 debug:
 	$(MAKE) st DEBUG=1
@@ -25,4 +39,4 @@ check:
 	./scripts/clang-checks.sh check
 
 clean:
-	make -C src/st clean
+	$(MAKE) -C src/st clean
