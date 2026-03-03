@@ -1,6 +1,6 @@
 #include "glyph.h"
 
-#include "../common/font8x8_basic.h"
+#include "../common/font8x8.h"
 #include "../common/text.h"
 #include "screen.h"
 #include "term.h"
