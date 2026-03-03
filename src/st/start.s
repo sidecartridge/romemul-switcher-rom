@@ -1,7 +1,7 @@
 .globl _start
 .extern _rom_switcher_main
 
-.equ ST_STACK_TOP, 0x00038000
+#include "mem.h"
 
 .text
 _start:
@@ -23,7 +23,7 @@ _start:
     bmi.s   halt
 
 have_supervisor:
-    move.l  #ST_STACK_TOP, %sp
+    move.l  #ST_STACK_TOP_ADDR_UL, %sp
     jsr     _rom_switcher_main
 
 halt:
