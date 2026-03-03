@@ -1,4 +1,4 @@
-#include "hatari_trace.h"
+#include "htrace.h"
 
 #if defined(_DEBUG) && (_DEBUG > 0)
 

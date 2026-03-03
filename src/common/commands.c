@@ -1,4 +1,4 @@
-#include "helper.h"
+#include "commands.h"
 
 enum {
   kRomInRamSwapOffset = 0x4,
@@ -49,10 +49,31 @@ static inline unsigned long random_generator() {
 static inline void srand_generator(unsigned long s) { seed = s; }
 
 static inline unsigned long get_system_time_seed(void) {
-  return (unsigned long)*((volatile unsigned long *)0x4BA);  // _hz_200 seed value
+  unsigned long s = 0xA5A5A5A5UL;
+
+  for (unsigned long i = 0; i < 16UL; i++) {
+    unsigned long tc = (unsigned long)(*(
+        volatile unsigned char *)0xFFFA23UL); /* Timer C data */
+
+    unsigned long tcd = (unsigned long)(*(
+        volatile unsigned char *)0xFFFA1DUL); /* Timer C&D control */
+
+    s ^= (tc << ((i & 3UL) * 8UL));
+
+    /* rotate left 5 bits */
+    s = (s << 5) | (s >> 27);
+
+    s ^= (tcd * 0x9EUL);
+  }
+
+  /* Optional: mix Timer D data if running */
+  s ^= ((unsigned long)(*(volatile unsigned char *)0xFFFA25UL) << 16);
+
+  return s;
 }
 
-static void copy_bytes(unsigned char *dst, const unsigned char *src, unsigned short len) {
+static void copy_bytes(unsigned char *dst, const unsigned char *src,
+                       unsigned short len) {
   unsigned short i;
   for (i = 0; i < len; ++i) {
     dst[i] = src[i];
@@ -161,9 +182,10 @@ static inline unsigned short hamming_encode(unsigned char data) {
 }
 
 static inline unsigned long send_magic_sequence_asm(unsigned long rom_addr,
-                                               unsigned short command,
-                                               unsigned short param) {
+                                                    unsigned short command,
+                                                    unsigned short param) {
   (void)rom_addr;
+
   // Send random magic number
   srand_generator(get_system_time_seed());
   unsigned long magic_number = random_generator() & 0xFFFEFFFE;
@@ -267,7 +289,8 @@ static inline unsigned long send_magic_sequence_asm(unsigned long rom_addr,
   return magic_number;
 }
 
-static unsigned long send_async_rom_command(unsigned short param, unsigned short command) {
+static unsigned long send_async_rom_command(unsigned short param,
+                                            unsigned short command) {
   unsigned long magic_number =
       send_magic_sequence_asm(scratch_rom_address, command, param << 1);
 
@@ -277,7 +300,8 @@ static unsigned long send_async_rom_command(unsigned short param, unsigned short
 static int send_sync_rom_command(unsigned short param, unsigned short command,
                                  unsigned short timeout) {
   // Save the previous value where the magic number was stored
-  volatile unsigned long *magic_number_ptr = (unsigned long *)(magic_number_address);
+  volatile unsigned long *magic_number_ptr =
+      (unsigned long *)(magic_number_address);
 
   // Send the MAGIC SEQUENCE to the ROM
   unsigned long magic_number =
@@ -327,7 +351,8 @@ void send_change_rom_command_and_hard_reset(unsigned char rom_index) {
 
 int read_flash_block(void *memory_exchange, unsigned long flash_address_offset,
                      unsigned short block_size) {
-  unsigned short flash_block_number = div_u32_u16(flash_address_offset, block_size);
+  unsigned short flash_block_number =
+      div_u32_u16(flash_address_offset, block_size);
 
   int error = 0;
 
@@ -344,8 +369,8 @@ int read_flash_block(void *memory_exchange, unsigned long flash_address_offset,
       (volatile unsigned short *)(remote_rom_address + kChecksumOffset);
 
   while (num_tries-- > 0) {
-    error = send_sync_rom_command(flash_block_number,
-                                  kCmdUnlockReadBlockMemory, 0x4000);
+    error = send_sync_rom_command(flash_block_number, kCmdUnlockReadBlockMemory,
+                                  0x4000);
     if (error != 0) {
       trace_msg(
           "[romswdbg] helper: unlock read block failed in read_flash_block\n");
@@ -354,22 +379,22 @@ int read_flash_block(void *memory_exchange, unsigned long flash_address_offset,
       // flash_block_number, flash_address_offset);
 
       // Coyiing the data from the ROM to the memory exchange
-      copy_bytes((unsigned char *)memory_exchange, (const unsigned char *)remote_rom_address,
-                 block_size);
+      copy_bytes((unsigned char *)memory_exchange,
+                 (const unsigned char *)remote_rom_address, block_size);
 
       // We can now copy the data from the unlocked hole in the memory exchange
       unsigned short checksum = 0;
       unsigned short i;
       for (i = 0; i < block_size; i += 2) {
-        unsigned short value = *((unsigned short *)((unsigned char *)memory_exchange + i));
+        unsigned short value =
+            *((unsigned short *)((unsigned char *)memory_exchange + i));
         checksum += value;
       }
 
       // Read the checksum only once per iteration
       remote_checksum = *remote_checksum_ptr;
       if (checksum != remote_checksum) {
-        trace_msg(
-            "[romswdbg] helper: checksum mismatch in read_flash_block\n");
+        trace_msg("[romswdbg] helper: checksum mismatch in read_flash_block\n");
       } else {
         // Exit the loop if the checksum matches
         break;
@@ -416,21 +441,21 @@ int read_flash_page(void *memory_exchange, unsigned long flash_address_offset,
   // A page is kReadRomPageSize composed of kReadRomBlockSize.
   trace_msg("[romswdbg] helper: read_flash_page begin\n");
   for (unsigned short i = 0; i < kReadBlocksPerPage; i++) {
-    if (read_flash_block((unsigned char *)memory_exchange + i * kReadRomBlockSize,
-                         flash_address_offset + i * kReadRomBlockSize,
-                         kReadRomBlockSize) != 0) {
-      trace_msg(
-          "[romswdbg] helper: read_flash_page failed on one block\n");
+    if (read_flash_block(
+            (unsigned char *)memory_exchange + i * kReadRomBlockSize,
+            flash_address_offset + i * kReadRomBlockSize,
+            kReadRomBlockSize) != 0) {
+      trace_msg("[romswdbg] helper: read_flash_page failed on one block\n");
       return -1;
     }
     if (endian == (unsigned char)kEndianBig) {
       trace_msg("[romswdbg] helper: read_flash_page endian swap\n");
       for (unsigned short j = 0; j < kReadRomBlockSize; j = j + 2) {
-        *((unsigned short *)((unsigned char *)memory_exchange + i * kReadRomBlockSize +
-                       j)) =
+        *((unsigned short *)((unsigned char *)memory_exchange +
+                             i * kReadRomBlockSize + j)) =
             be_to_le_word(
                 *((unsigned short *)((unsigned char *)memory_exchange +
-                               i * kReadRomBlockSize + j)));
+                                     i * kReadRomBlockSize + j)));
       }
     }
   }
