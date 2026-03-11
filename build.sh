@@ -1,6 +1,9 @@
 #!/bin/sh
 set -eu
 
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)"
+cd "${SCRIPT_DIR}"
+
 usage() {
   echo "Usage: ./build.sh [st|ste|amiga|all] [debug] [test]" >&2
 }
@@ -148,9 +151,9 @@ if [ "${DEBUG_MODE}" = "0" ] && [ "${TEST_MODE}" = "0" ]; then
 fi
 
 if [ "${TARGET_PLATFORM}" = "amiga" ]; then
-  STCMD_NO_TTY=1 ST_WORKING_FOLDER=/Users/diego/mister_wkspc/romemul-switcher-rom stcmd make amiga DEBUG="${DEBUG_MODE}" TEST="${TEST_MODE}" ROM_BASE_ADDR_UL="${ROM_BASE_ADDR_UL_VALUE}"
+  STCMD_NO_TTY=1 ST_WORKING_FOLDER="${SCRIPT_DIR}" stcmd make amiga DEBUG="${DEBUG_MODE}" TEST="${TEST_MODE}" ROM_BASE_ADDR_UL="${ROM_BASE_ADDR_UL_VALUE}"
 else
-  STCMD_NO_TTY=1 ST_WORKING_FOLDER=/Users/diego/mister_wkspc/romemul-switcher-rom stcmd make st DEBUG="${DEBUG_MODE}" TEST="${TEST_MODE}" ROM_BASE_ADDR_UL="${ROM_BASE_ADDR_UL_VALUE}" STARTUP_ROM_ASM="${STARTUP_ROM_ASM_VALUE}"
+  STCMD_NO_TTY=1 ST_WORKING_FOLDER="${SCRIPT_DIR}" stcmd make st DEBUG="${DEBUG_MODE}" TEST="${TEST_MODE}" ROM_BASE_ADDR_UL="${ROM_BASE_ADDR_UL_VALUE}" STARTUP_ROM_ASM="${STARTUP_ROM_ASM_VALUE}"
 fi
 
 publish_rom_artifacts_if_present() {
