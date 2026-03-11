@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout the code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install AtariST Toolkit Docker image
+      run: curl -sL https://github.com/sidecartridge/atarist-toolkit-docker/releases/download/v1.0.0/install_atarist_toolkit_docker.sh | bash
+
+    - name: Run build and publish
+      run: STCMD_NO_TTY=1 ./build.sh all
+
+    - name: Get version from version.txt
+      id: get_version
+      run: echo "RELEASE_VERSION=$(tr -d '\r\n' < version.txt)" >> "$GITHUB_ENV"
+
+    - name: Get current date
+      id: build
+      run: echo "date=$(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> "$GITHUB_OUTPUT"
+
+    - name: Read partial CHANGELOG.md content
+      id: changelog
+      run: |
+        echo "CHANGELOG<<EOF" >> "$GITHUB_ENV"
+        awk '/^---$/ { exit } { print }' CHANGELOG.md >> "$GITHUB_ENV"
+        echo "EOF" >> "$GITHUB_ENV"
+
+    - name: Copy release artifacts
+      run: |
+        mkdir -p release
+        cp dist/st/*.img release/
+        cp dist/ste/*.img release/
+        cp dist/amiga/*.img release/
+
+    - name: Upload the binaries to release
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: release/*
+        tag: ${{ github.ref }}
+        release_name: ${{ env.RELEASE_VERSION }}
+        body: |
+          **Release Notes:**
+          - Build Date: ${{ steps.build.outputs.date }}
+          - Version: ${{ env.RELEASE_VERSION }}
+
+          ${{ env.CHANGELOG }}
+        file_glob: true
+        overwrite: true
+        make_latest: true

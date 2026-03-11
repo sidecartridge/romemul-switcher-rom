@@ -1,9 +1,16 @@
-#include "glyph.h"
+/**
+ * File: src/st/glyph.c
+ * Author: Diego Parrilla Santamaría
+ * Date: 2026-03-11
+ * Copyright: 2024-26 - GOODDATA LABS SL
+ * Description: Atari ST bitmap glyph rendering implementation.
+ */
 
 #include "../common/font8x8.h"
+#include "../common/glyph.h"
 #include "../common/text.h"
+#include "../common/term.h"
 #include "screen.h"
-#include "term.h"
 
 enum {
   kRowShift1024 = 10,

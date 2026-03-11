@@ -1,3 +1,11 @@
+/**
+ * File: src/st/mem.h
+ * Author: Diego Parrilla Santamaría
+ * Date: 2026-03-11
+ * Copyright: 2024-26 - GOODDATA LABS SL
+ * Description: Atari ST memory layout constants.
+ */
+
 #pragma once
 
 #ifndef ROM_BASE_ADDR_UL
@@ -42,7 +50,6 @@ enum {
       1 / ((ST_LAYOUT_VARS_END <= ST_RAM_TOP_ADDR_UL) ? 1 : 0)
 };
 
-#define ST_STACK_TOP_ADDR ((unsigned long)ST_STACK_TOP_ADDR_UL)
 #define ST_SCREEN_BASE_ADDR ((unsigned long)ST_SCREEN_BASE_ADDR_UL)
 #define ST_RAM_VARS_BASE_ADDR ((unsigned long)ST_RAM_VARS_BASE_ADDR_UL)
 

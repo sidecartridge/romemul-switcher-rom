@@ -1,18 +1,19 @@
+/**
+ * File: src/st/startup_st.s
+ * Author: Diego Parrilla Santamaría
+ * Date: 2026-03-11
+ * Copyright: 2024-26 - GOODDATA LABS SL
+ * Description: Atari ST ROM startup assembly.
+ */
+
 .globl _os_entry
 .globl _os_beg
 .globl _os_magic
 .globl _os_date
 .globl _os_conf
 .globl _os_dosdate
-.globl _ui_mupb
 .globl _main
 
-.extern _root
-.extern _run
-.extern _shifty
-.extern _endvdibss
-.extern _endgembss
-.extern gemstart
 .extern _rom_switcher_main
 .extern __ram_code_rom_start
 .extern __ram_code_start

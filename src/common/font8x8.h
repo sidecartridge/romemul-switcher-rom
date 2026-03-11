@@ -1,4 +1,12 @@
 /**
+ * File: src/common/font8x8.h
+ * Author: Diego Parrilla Santamaría
+ * Date: 2026-03-11
+ * Copyright: 2024-26 - GOODDATA LABS SL
+ * Description: Shared 8x8 bitmap font data.
+ */
+
+/**
  * 8x8 monochrome bitmap fonts for rendering
  * Author: Daniel Hepper <daniel@hepper.net>
  *

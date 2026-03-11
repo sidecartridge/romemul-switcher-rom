@@ -1,3 +1,11 @@
+/**
+ * File: src/st/start.s
+ * Author: Diego Parrilla Santamaría
+ * Date: 2026-03-11
+ * Copyright: 2024-26 - GOODDATA LABS SL
+ * Description: Atari ST bootstrap and ROM entry assembly.
+ */
+
 .globl _start
 .extern _rom_switcher_main
 

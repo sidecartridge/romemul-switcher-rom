@@ -1,4 +1,12 @@
-#include "kbd.h"
+/**
+ * File: src/st/kbd.c
+ * Author: Diego Parrilla Santamaría
+ * Date: 2026-03-11
+ * Copyright: 2024-26 - GOODDATA LABS SL
+ * Description: Atari ST keyboard input handling.
+ */
+
+#include "../common/kbd.h"
 
 enum {
   kAciaBaseAddr = 0x00FFFC00UL,
@@ -150,4 +158,8 @@ unsigned char kbd_poll_scancode_wait(void) {
 
 void kbd_wait_for_key_press(void) {
   (void)kbd_poll_scancode_wait();
+}
+
+unsigned char kbd_wait_for_key_or_esc(void) {
+  return (kbd_poll_scancode_wait() == KEY_ESC) ? KEY_ESC : 0U;
 }

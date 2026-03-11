@@ -1,31 +1,61 @@
+/**
+ * File: src/st/screen.c
+ * Author: Diego Parrilla Santamaría
+ * Date: 2026-03-11
+ * Copyright: 2024-26 - GOODDATA LABS SL
+ * Description: Atari ST screen setup and framebuffer control.
+ */
+
 #include "screen.h"
 
+#include "mem.h"
 #include "palette.h"
 
+#define ST_VIDEO_BASE ((volatile unsigned char *)ST_SCREEN_BASE_ADDR)
 #define ST_PALETTE_BASE ((volatile unsigned short *)(unsigned long)0x00FF8240UL)
 #define ST_MFP_GPIP (*(volatile unsigned char *)(unsigned long)0x00FFFA01UL)
-
 #define ST_SHIFTER_MODE (*(volatile unsigned char *)(unsigned long)0x00FF8260UL)
-
 #define ST_SHIFTER_BASE_HI (*(volatile unsigned char *)(unsigned long)0x00FF8201UL)
 #define ST_SHIFTER_BASE_MID (*(volatile unsigned char *)(unsigned long)0x00FF8203UL)
+#define ST_VIDEO_MODE \
+  (*(volatile unsigned char *)(unsigned long)(ST_RAM_VARS_BASE_ADDR_UL + 5U))
+#define ST_VIDEO_MODE_VALID \
+  (*(volatile unsigned char *)(unsigned long)(ST_RAM_VARS_BASE_ADDR_UL + 6U))
 
 enum {
   kShifterModeMedium = 0x01U,
   kShifterModeHi = 0x02U,
   kShifterModeMask = 0x03U,
+  kMonitorColorDetectBit = 0x80U,
   kByteShiftHigh = 16,
   kByteShiftMid = 8,
-  kByteMask = 0xFFU,
-  kMfpGpipVblMask = 0x0080U
+  kByteMask = 0xFFU
 };
+
+volatile unsigned char *term_video_base(void) { return ST_VIDEO_BASE; }
+
+volatile unsigned short *term_cursor_col_ptr(void) {
+  return (volatile unsigned short *)(unsigned long)(ST_RAM_VARS_BASE_ADDR_UL + 0U);
+}
+
+volatile unsigned short *term_cursor_row_ptr(void) {
+  return (volatile unsigned short *)(unsigned long)(ST_RAM_VARS_BASE_ADDR_UL + 2U);
+}
+
+volatile unsigned char *term_text_color_ptr(void) {
+  return (volatile unsigned char *)(unsigned long)(ST_RAM_VARS_BASE_ADDR_UL + 4U);
+}
+
+unsigned short term_text_row_bytes(void) { return 1280U; }
+
+void term_screen_clear(void) { screen_clear(); }
 
 void screen_init(void) {
   const unsigned long base = ST_SCREEN_BASE_ADDR;
   const unsigned char gpip = ST_MFP_GPIP;
 
   /* GPIP bit 7: 0=mono monitor, 1=color monitor. */
-  if (gpip & ST_MONO_DETECT_BIT) {
+  if (gpip & kMonitorColorDetectBit) {
     ST_SHIFTER_MODE = kShifterModeMedium; /* 640x200, 4 colours */
   } else {
     ST_SHIFTER_MODE = kShifterModeHi; /* 640x400, monochrome */
@@ -54,7 +84,7 @@ unsigned char screen_is_medium_mode(void) {
 }
 
 void screen_set_display_palette(void) {
-  if (ST_MFP_GPIP & ST_MONO_DETECT_BIT) {
+  if (ST_MFP_GPIP & kMonitorColorDetectBit) {
     ST_PALETTE_BASE[SCREEN_PAL_INDEX_0] = SCREEN_PAL_COLOR_IDX0;
     ST_PALETTE_BASE[SCREEN_PAL_INDEX_1] = SCREEN_PAL_COLOR_IDX1;
     ST_PALETTE_BASE[SCREEN_PAL_INDEX_2] = SCREEN_PAL_COLOR_IDX2;
@@ -64,12 +94,5 @@ void screen_set_display_palette(void) {
     ST_PALETTE_BASE[SCREEN_PAL_INDEX_1] = SCREEN_PAL_MONO_IDX1;
     ST_PALETTE_BASE[SCREEN_PAL_INDEX_2] = SCREEN_PAL_MONO_IDX2;
     ST_PALETTE_BASE[SCREEN_PAL_INDEX_3] = SCREEN_PAL_MONO_IDX3;
-  }
-}
-
-void screen_wait_vbl(void) {
-  volatile unsigned short *const mfpVblReg = (volatile unsigned short *)0xFFFA06;
-  while (!(*mfpVblReg & kMfpGpipVblMask)) {
-    /* wait */
   }
 }

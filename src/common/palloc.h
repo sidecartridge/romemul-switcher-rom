@@ -1,3 +1,11 @@
+/**
+ * File: src/common/palloc.h
+ * Author: Diego Parrilla Santamaría
+ * Date: 2026-03-11
+ * Copyright: 2024-26 - GOODDATA LABS SL
+ * Description: Shared bump allocator declarations.
+ */
+
 #pragma once
 
 

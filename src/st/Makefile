@@ -62,7 +62,7 @@ ASFLAGS := $(ASFLAGS_BASE) -DROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL)
 LDFLAGS := $(NO_EXT_LIB_FLAGS) -Wl,--traditional-format,-Map=$(TARGET_MAP),--entry,_start
 LDFLAGS_ROM := $(NO_EXT_LIB_FLAGS) -Wl,-Map=$(TARGET_ROM_MAP),--entry,_os_entry,-T,$(ROM_LDSCRIPT),--oformat,binary
 
-SRCS_C := switcher.c text.c screen.c kbd.c glyph.c htrace.c palloc.c commands.c chooser.c
+SRCS_C := switcher.c text.c screen.c kbd.c glyph.c platform.c htrace.c palloc.c commands.c chooser.c
 ifeq ($(TEST),1)
 SRCS_C += test.c
 endif
@@ -97,9 +97,10 @@ $(BUILD_DIR)/%.c.o: %.c $(BUILD_CONFIG_STAMP) | $(BUILD_DIR)
 $(BUILD_DIR)/%.s.o: %.s $(BUILD_CONFIG_STAMP) | $(BUILD_DIR)
 	$(AS) $(ASFLAGS) -c $< -o $@
 
-$(ROM_LDSCRIPT): rom_abs.ld.S mem.h $(BUILD_CONFIG_STAMP) | $(BUILD_DIR)
+$(ROM_LDSCRIPT): rom_abs.ld.S mem.h Makefile $(BUILD_CONFIG_STAMP) | $(BUILD_DIR)
 	$(CC) -E -P -x c -D__ASSEMBLER__=1 -DROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_LD) \
-	  -DSTARTUP_ROM_OBJ=$(STARTUP_ROM_OBJ) $< -o $@
+	  -DSTARTUP_ROM_OBJ=$(STARTUP_ROM_OBJ) $< -o $@.tmp
+	mv $@.tmp $@
 
 $(BUILD_DIR)/commands.c.o: ../common/commands.h
 $(BUILD_DIR)/chooser.c.o: ../common/chooser.h

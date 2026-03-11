@@ -1,4 +1,14 @@
+/**
+ * File: src/common/commands.c
+ * Author: Diego Parrilla Santamaría
+ * Date: 2026-03-11
+ * Copyright: 2024-26 - GOODDATA LABS SL
+ * Description: Shared ROM command and flash helpers.
+ */
+
 #include "commands.h"
+
+#include "platform.h"
 
 enum {
   kRomInRamSwapOffset = 0x4,
@@ -20,10 +30,7 @@ static inline unsigned short be_to_le_word(unsigned short x) {
 static unsigned long remote_rom_address = 0;
 static unsigned long scratch_rom_address = 0;
 static unsigned long magic_number_address = 0;
-static unsigned long previous_magic_number_value = 0;
 static helper_trace_fn_t g_trace_fn = (helper_trace_fn_t)0;
-
-static unsigned long seed = 1;
 
 static unsigned short div_u32_u16(unsigned long n, unsigned short d) {
   unsigned short q = 0;
@@ -35,41 +42,6 @@ static unsigned short div_u32_u16(unsigned long n, unsigned short d) {
     ++q;
   }
   return q;
-}
-
-// Simple LCG: returns a pseudo-random number
-static inline unsigned long random_generator() {
-  // Xorshift32 variant: avoids libgcc 32-bit multiply helpers.
-  seed ^= (seed << 13);
-  seed ^= (seed >> 17);
-  seed ^= (seed << 5);
-  return seed & 0x7fffffffU;
-}
-// Seed the random number generator (you can set this to any value you want)
-static inline void srand_generator(unsigned long s) { seed = s; }
-
-static inline unsigned long get_system_time_seed(void) {
-  unsigned long s = 0xA5A5A5A5UL;
-
-  for (unsigned long i = 0; i < 16UL; i++) {
-    unsigned long tc = (unsigned long)(*(
-        volatile unsigned char *)0xFFFA23UL); /* Timer C data */
-
-    unsigned long tcd = (unsigned long)(*(
-        volatile unsigned char *)0xFFFA1DUL); /* Timer C&D control */
-
-    s ^= (tc << ((i & 3UL) * 8UL));
-
-    /* rotate left 5 bits */
-    s = (s << 5) | (s >> 27);
-
-    s ^= (tcd * 0x9EUL);
-  }
-
-  /* Optional: mix Timer D data if running */
-  s ^= ((unsigned long)(*(volatile unsigned char *)0xFFFA25UL) << 16);
-
-  return s;
 }
 
 static void copy_bytes(unsigned char *dst, const unsigned char *src,
@@ -131,12 +103,14 @@ static void trace_u32_hex(const char *name, unsigned long value) {
 
 void init_rom_address(unsigned long rom_base_address,
                       helper_trace_fn_t trace_fn) {
+  const unsigned long previous_magic_number_value =
+      *((volatile unsigned long *)(rom_base_address));
+
   g_trace_fn = trace_fn;
   unsigned long addr = (unsigned long)rom_base_address;
   magic_number_address = addr;
   scratch_rom_address = addr;
   remote_rom_address = addr + kRomInRamSwapOffset;
-  previous_magic_number_value = *((volatile unsigned long *)(addr));
   trace_u32_hex("rom_base_address", addr);
   trace_u32_hex("magic_number_address", magic_number_address);
   trace_u32_hex("scratch_rom_address", scratch_rom_address);
@@ -184,109 +158,7 @@ static inline unsigned short hamming_encode(unsigned char data) {
 static inline unsigned long send_magic_sequence_asm(unsigned long rom_addr,
                                                     unsigned short command,
                                                     unsigned short param) {
-  (void)rom_addr;
-
-  // Send random magic number
-  srand_generator(get_system_time_seed());
-  unsigned long magic_number = random_generator() & 0xFFFEFFFE;
-  unsigned short magic_number_lsb = magic_number & 0xFFFF;
-  unsigned short magic_number_msb = ((magic_number >> 16) & 0xFFFF);
-
-  unsigned short checksum = command;
-  checksum += param;
-  checksum += magic_number_lsb;
-  checksum += magic_number_msb;
-  checksum = checksum & 0xFFFE;
-
-  if (magic_number_address == 0xFC0000) {
-    // Send the MAGIC SEQUENCE to the ROM for ST ROMS
-    asm volatile(
-        "move.l #0xFC0000, %%d1\n\t"
-        "move.l %%d1, %%d2\n\t"
-        "move.l %%d1, %%d3\n\t"
-        "move.l %%d1, %%d4\n\t"
-        "move.l %%d1, %%d5\n\t"
-        "\n\t"
-        "move.w %0, %%d1\n\t"
-        "move.l %%d1, %%a0\n\t"
-        "\n\t"
-        "move.w %1, %%d2\n\t"
-        "move.l %%d2, %%a1\n\t"
-        "\n\t"
-        "move.w %2, %%d3\n\t"
-        "move.l %%d3, %%a2\n\t"
-        "\n\t"
-        "move.w %3, %%d4\n\t"
-        "move.l %%d4, %%a3\n\t"
-        "\n\t"
-        "move.w %4, %%d5\n\t"
-        "move.l %%d5, %%a4\n\t"
-        "\n\t"
-        "move.b 0xFC1234, %%d0\n\t"
-        "move.b 0xFCFC42, %%d0\n\t"
-        "move.b 0xFC6452, %%d0\n\t"
-        "move.b 0xFCCDE0, %%d0\n\t"
-        "move.b 0xFC5CA2, %%d0\n\t"
-        "move.b 0xFC8CA4, %%d0\n\t"
-        "move.b 0xFC1F94, %%d0\n\t"
-        "move.b 0xFCE642, %%d0\n\t"
-        "move.b (%%a0),%%d1\n\t"
-        "move.b (%%a1),%%d2\n\t"
-        "move.b (%%a2),%%d3\n\t"
-        "move.b (%%a3),%%d4\n\t"
-        "move.b (%%a4),%%d5\n\t"
-
-        "\n\t"
-        :
-        : "m"(magic_number_msb), "m"(magic_number_lsb), "m"(command),
-          "m"(param), "m"(checksum)
-        : "d0", "d1", "d2", "d3", "d4", "d5", "a0", "a1", "a2", "a3", "a4");
-  }
-  if (magic_number_address == 0xE00000) {
-    // Send the MAGIC SEQUENCE to the ROM for STE and MegaSTE ROMS
-    asm volatile(
-        "move.l #0xE00000, %%d1\n\t"
-        "move.l %%d1, %%d2\n\t"
-        "move.l %%d1, %%d3\n\t"
-        "move.l %%d1, %%d4\n\t"
-        "move.l %%d1, %%d5\n\t"
-        "\n\t"
-        "move.w %0, %%d1\n\t"
-        "move.l %%d1, %%a0\n\t"
-        "\n\t"
-        "move.w %1, %%d2\n\t"
-        "move.l %%d2, %%a1\n\t"
-        "\n\t"
-        "move.w %2, %%d3\n\t"
-        "move.l %%d3, %%a2\n\t"
-        "\n\t"
-        "move.w %3, %%d4\n\t"
-        "move.l %%d4, %%a3\n\t"
-        "\n\t"
-        "move.w %4, %%d5\n\t"
-        "move.l %%d5, %%a4\n\t"
-        "\n\t"
-        "move.b 0xE01234, %%d0\n\t"
-        "move.b 0xE0FC42, %%d0\n\t"
-        "move.b 0xE06452, %%d0\n\t"
-        "move.b 0xE0CDE0, %%d0\n\t"
-        "move.b 0xE05CA2, %%d0\n\t"
-        "move.b 0xE08CA4, %%d0\n\t"
-        "move.b 0xE01F94, %%d0\n\t"
-        "move.b 0xE0E642, %%d0\n\t"
-        "move.b (%%a0),%%d1\n\t"
-        "move.b (%%a1),%%d2\n\t"
-        "move.b (%%a2),%%d3\n\t"
-        "move.b (%%a3),%%d4\n\t"
-        "move.b (%%a4),%%d5\n\t"
-
-        "\n\t"
-        :
-        : "m"(magic_number_msb), "m"(magic_number_lsb), "m"(command),
-          "m"(param), "m"(checksum)
-        : "d0", "d1", "d2", "d3", "d4", "d5", "a0", "a1", "a2", "a3", "a4");
-  }
-  return magic_number;
+  return platform_send_magic_sequence(rom_addr, command, param);
 }
 
 static unsigned long send_async_rom_command(unsigned short param,
@@ -314,6 +186,8 @@ static int send_sync_rom_command(unsigned short param, unsigned short command,
   unsigned short num_tries = timeout;
 
   while (num_tries-- > 0) {
+    platform_poll();
+
     // If the magic number is 0xFFFFFFD, then there was a checksum error
     if (current_magic_number == 0xFFFFFFFD) {
       return -2;  // Checksum error
@@ -334,23 +208,12 @@ static int send_sync_rom_command(unsigned short param, unsigned short command,
 void send_change_rom_command_and_hard_reset(unsigned char rom_index) {
   send_magic_sequence_asm(scratch_rom_address, kCmdSelectRom,
                           hamming_encode(rom_index) << 1);
-
-  // Disable all interrupts, wait some seconds and finally do a hard reset
-  __asm__(
-      "move.w #0x2700, %sr\n\t"
-      "move.l #0xFFFFF, %d0\n\t"
-      "1: nop\n\t"
-      "subq.l #1, %d0\n\t"
-      "bne.s 1b\n\t"
-      "clr.l 0x00000420\n\t"  // Invalidate memory system variables
-      "clr.l 0x0000043A\n\t"
-      "clr.l 0x0000051A\n\t"
-      "move.l (0x4), %a0\n\t"  // Now we can safely jump to the reset vector
-      "jmp (%a0)");
+  platform_hard_reset();
 }
 
-int read_flash_block(void *memory_exchange, unsigned long flash_address_offset,
-                     unsigned short block_size) {
+static int read_flash_block(void *memory_exchange,
+                            unsigned long flash_address_offset,
+                            unsigned short block_size) {
   unsigned short flash_block_number =
       div_u32_u16(flash_address_offset, block_size);
 
@@ -369,6 +232,8 @@ int read_flash_block(void *memory_exchange, unsigned long flash_address_offset,
       (volatile unsigned short *)(remote_rom_address + kChecksumOffset);
 
   while (num_tries-- > 0) {
+    platform_poll();
+
     error = send_sync_rom_command(flash_block_number, kCmdUnlockReadBlockMemory,
                                   0x4000);
     if (error != 0) {

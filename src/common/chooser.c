@@ -1,17 +1,31 @@
+/**
+ * File: src/common/chooser.c
+ * Author: Diego Parrilla Santamaría
+ * Date: 2026-03-11
+ * Copyright: 2024-26 - GOODDATA LABS SL
+ * Description: Shared ROM chooser and menu flow.
+ */
+
 #include "chooser.h"
 
+#include "commands.h"
+#include "kbd.h"
 #include "palloc.h"
 #include "test.h"
 #include "text.h"
-#include "commands.h"
-#include "../st/kbd.h"
 
 enum {
   kScreenWidthChars = 80,
   kPaginatedContentYOffset = 5,
   kMetadataFlagActive = 0x1U,
   kMetadataFlagRescue = 0x2U,
-  kSwitcherTosProtocolVersion = 0x0031
+  kSwitcherTosProtocolVersion = 0x0031,
+  kRomNameSize = 64,
+  kRomDescriptionSize = 256,
+  kRomCompressedClusterSize = 184,
+  kDefaultRomIndex = 70,
+  kRescueRomIndex = 256 + kDefaultRomIndex,
+  kElementsPerPage = 17
 };
 
 #define ENDIAN_BIG 1
@@ -24,23 +38,31 @@ enum {
 #define BIG_ENDIAN_TO_LITTLE_ENDIAN_WORD(x) \
   (((x) & 0xFF00) >> 8) | (((x) & 0x00FF) << 8)
 
-static void copy_name(char dst[ROM_NAME_SIZE], const unsigned char *src) {
+typedef struct {
+  char name[kRomNameSize];
+  unsigned long blocks;
+  unsigned long metadata;
+  unsigned char compressed_blocks[kRomCompressedClusterSize];
+} rom_catalog_t;
+
+static void copy_name(char dst[kRomNameSize], const unsigned char *src) {
   unsigned int i = 0U;
-  while (i + 1U < ROM_NAME_SIZE && src[i] != 0U) {
+  while (i + 1U < kRomNameSize && src[i] != 0U) {
     dst[i] = (char)src[i];
     ++i;
   }
   dst[i] = '\0';
 }
 
-int parse_rom_description(unsigned char *rom_desc_raw, unsigned char *rom_params_raw,
-                          rom_catalog_t **rom_desc) {
+static int parse_rom_description(unsigned char *rom_desc_raw,
+                                 unsigned char *rom_params_raw,
+                                 rom_catalog_t **rom_desc) {
   unsigned long default_rom_index =
-      (unsigned long)rom_params_raw[DEFAULT_ROM_INDEX] |
-      ((unsigned long)rom_params_raw[DEFAULT_ROM_INDEX + 1] << 8);
+      (unsigned long)rom_params_raw[kDefaultRomIndex] |
+      ((unsigned long)rom_params_raw[kDefaultRomIndex + 1] << 8);
   unsigned long rescue_rom_index =
-      (unsigned long)rom_params_raw[RESCUE_ROM_INDEX] |
-      ((unsigned long)rom_params_raw[RESCUE_ROM_INDEX + 1] << 8);
+      (unsigned long)rom_params_raw[kRescueRomIndex] |
+      ((unsigned long)rom_params_raw[kRescueRomIndex + 1] << 8);
 
 #if defined(_DEBUG) && (_DEBUG > 0)
   text_printf("Default ROM index: %lu\n\r", default_rom_index);
@@ -51,7 +73,7 @@ int parse_rom_description(unsigned char *rom_desc_raw, unsigned char *rom_params
   int scan_offset = 0;
   while (rom_desc_raw[scan_offset] != 0U) {
     count++;
-    scan_offset += ROM_DESCRIPTION_SIZE;
+    scan_offset += kRomDescriptionSize;
   }
 
   if (count <= 0) {
@@ -64,17 +86,18 @@ int parse_rom_description(unsigned char *rom_desc_raw, unsigned char *rom_params
     return 0;
   }
 
-  *rom_desc = (rom_catalog_t *)pa_alloc(((unsigned long)count) << 8);
+  *rom_desc = (rom_catalog_t *)pa_alloc((unsigned long)count *
+                                        (unsigned long)kRomDescriptionSize);
   if (*rom_desc == (rom_catalog_t *)0) {
     return 0;
   }
 
   int offset = 0;
-  for (int i = 0; i < count; i++, offset += ROM_DESCRIPTION_SIZE) {
+  for (int i = 0; i < count; i++, offset += kRomDescriptionSize) {
     copy_name((*rom_desc)[i].name, &rom_desc_raw[offset]);
     (*rom_desc)[i].blocks =
-        ((unsigned long)rom_desc_raw[offset + ROM_NAME_SIZE] << 8) |
-        (unsigned long)rom_desc_raw[offset + ROM_NAME_SIZE + 1];
+        ((unsigned long)rom_desc_raw[offset + kRomNameSize] << 8) |
+        (unsigned long)rom_desc_raw[offset + kRomNameSize + 1];
 
     unsigned short metadata = 0;
     if (i == (int)default_rom_index) {
@@ -89,7 +112,7 @@ int parse_rom_description(unsigned char *rom_desc_raw, unsigned char *rom_params
   return count;
 }
 
-char *create_file_array(rom_catalog_t *rom_desc, int num_entries) {
+static char *create_file_array(rom_catalog_t *rom_desc, int num_entries) {
   int total_length = 0;
   for (int i = 0; i < num_entries; i++) {
     total_length += kScreenWidthChars + 1;
@@ -107,7 +130,7 @@ char *create_file_array(rom_catalog_t *rom_desc, int num_entries) {
   for (int i = 0; i < num_entries; i++) {
     int trimmed_str_len = 0;
     while (trimmed_str_len < custom_rom_name_size &&
-           trimmed_str_len < ROM_NAME_SIZE &&
+           trimmed_str_len < kRomNameSize &&
            rom_desc[i].name[trimmed_str_len] != '\0') {
       trimmed_str_len++;
     }
@@ -151,12 +174,10 @@ char *create_file_array(rom_catalog_t *rom_desc, int num_entries) {
     current_ptr[5] = 'K';
     current_ptr[6] = 'B';
     current_ptr[7] = ' ';
-    current_ptr[8] = ((rom_desc[i].metadata & kMetadataFlagActive) != 0U)
-                         ? 'A'
-                         : ' ';
-    current_ptr[9] = ((rom_desc[i].metadata & kMetadataFlagRescue) != 0U)
-                         ? 'R'
-                         : ' ';
+    current_ptr[8] =
+        ((rom_desc[i].metadata & kMetadataFlagActive) != 0U) ? 'A' : ' ';
+    current_ptr[9] =
+        ((rom_desc[i].metadata & kMetadataFlagRescue) != 0U) ? 'R' : ' ';
     current_ptr[10] = ' ';
 
     current_ptr += custom_memory_info_size;
@@ -239,9 +260,9 @@ static int div_u16(int n, int d) {
   return q;
 }
 
-int display_paginated_content(char *file_array, int num_files, int page_size,
-                              char *item_name, char *extra_bar,
-                              unsigned long *keypress) {
+static int display_paginated_content(char *file_array, int num_files,
+                                     int page_size, char *item_name,
+                                     char *extra_bar) {
   int selected_rom = -1;
   int page_number = 0;
   int current_index = 0;
@@ -270,7 +291,7 @@ int display_paginated_content(char *file_array, int num_files, int page_size,
 
     char *current_ptr = file_array;
     int index = 0;
-    int current_line = 2 + (ELEMENTS_PER_PAGE - page_size);
+    int current_line = 2 + (kElementsPerPage - page_size);
     text_set_cursor(0, current_line);
     deleteLineFromCursor();
     text_printf("%s found: %d. ", item_name, num_files);
@@ -301,9 +322,6 @@ int display_paginated_content(char *file_array, int num_files, int page_size,
       highlight_and_print(file_array, (unsigned short)current_index,
                           (unsigned short)start_index, current_line, 1U);
       key = kbd_poll_scancode_wait();
-      if (keypress != (unsigned long *)0) {
-        *keypress = key;
-      }
       switch (key) {
         case KEY_UP_ARROW:
           if (current_index > start_index) {
@@ -350,9 +368,6 @@ int display_paginated_content(char *file_array, int num_files, int page_size,
         case KEY_U:
           return -1;
         default:
-          if (keypress != (unsigned long *)0) {
-            *keypress = key;
-          }
           break;
       }
 
@@ -405,9 +420,9 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
       parse_rom_description(flashCatalogRaw, flashParamsRaw, &rom_descriptions);
   text_printf("Number of ROM entries: %d\n\r", num_entries);
   protocol_version =
-      (signed short)((unsigned short)flashParamsRaw[ROM_DESCRIPTION_SIZE * 2] |
+      (signed short)((unsigned short)flashParamsRaw[kRomDescriptionSize * 2] |
                      ((unsigned short)
-                          flashParamsRaw[1 + (ROM_DESCRIPTION_SIZE * 2)]
+                          flashParamsRaw[1 + (kRomDescriptionSize * 2)]
                       << 8));
   text_printf("Protocol version: %x\n\r", protocol_version);
 #else
@@ -433,9 +448,9 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
     }
   }
 
-  protocol_version = (signed short)(buffer_params[ROM_DESCRIPTION_SIZE * 2] +
-                                    (buffer_params[1 + (ROM_DESCRIPTION_SIZE * 2)] *
-                                     256U));
+  protocol_version =
+      (signed short)(buffer_params[kRomDescriptionSize * 2] +
+                     (buffer_params[1 + (kRomDescriptionSize * 2)] * 256U));
 
   num_entries = parse_rom_description(buffer, buffer_params, &rom_descriptions);
 #endif
@@ -466,10 +481,9 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
       kbd_wait_for_key_press();
       return;
     } else {
-      unsigned long keypress = 0U;
       rom_number = display_paginated_content(
-          file_array, num_entries, ELEMENTS_PER_PAGE, "ROM images",
-          "[ENTER] or [RETURN] to load the ROM.", &keypress);
+          file_array, num_entries, kElementsPerPage, "ROM images",
+          "[ENTER] or [RETURN] to load the ROM.");
     }
 
     if (rom_number > 0) {
@@ -484,7 +498,7 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
           "Press any key to load the ROM image and reset the computer (ESC to "
           "cancel).\r");
 
-      confirm_key = kbd_poll_scancode_wait();
+      confirm_key = kbd_wait_for_key_or_esc();
       if (confirm_key == KEY_ESC) {
         rom_number = 0;
         continue;
