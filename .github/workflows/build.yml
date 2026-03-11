@@ -21,6 +21,9 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Install amitools
+      run: python -m pip install --upgrade pip amitools
+
     - name: Install AtariST Toolkit Docker image
       run: curl -sL https://github.com/sidecartridge/atarist-toolkit-docker/releases/download/latest/install_atarist_toolkit_docker.sh | bash
 
