@@ -1,3 +1,11 @@
+/**
+ * File: src/common/palloc.c
+ * Author: Diego Parrilla Santamaría
+ * Date: 2026-03-11
+ * Copyright: 2024-26 - GOODDATA LABS SL
+ * Description: Shared bump allocator implementation.
+ */
+
 #include "palloc.h"
 
 enum { kDefAlign = 4U };

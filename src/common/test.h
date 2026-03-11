@@ -1,3 +1,11 @@
+/**
+ * File: src/common/test.h
+ * Author: Diego Parrilla Santamaría
+ * Date: 2026-03-11
+ * Copyright: 2024-26 - GOODDATA LABS SL
+ * Description: Embedded test data declarations.
+ */
+
 #ifndef TEST_H_
 #define TEST_H_
 

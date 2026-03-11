@@ -1,7 +1,16 @@
+/**
+ * File: src/common/text.c
+ * Author: Diego Parrilla Santamaría
+ * Date: 2026-03-11
+ * Copyright: 2024-26 - GOODDATA LABS SL
+ * Description: Shared terminal-style text rendering helpers.
+ */
+
 #include "text.h"
 
-#include "../st/glyph.h"
-#include "../st/term.h"
+#include "glyph.h"
+#include "platform.h"
+#include "term.h"
 
 #ifndef APP_VERSION_STR
 #define APP_VERSION_STR "0.0.0"
@@ -22,7 +31,6 @@ enum {
 };
 
 enum {
-  kTextRowBytes = 1280U,
   kVt52CoordBias = 32U,
   kEscCode = 0x1BU,
   kTabWidth = 8U,
@@ -49,14 +57,14 @@ static inline void textPutSpaceAt(unsigned short col, unsigned short row) {
 static volatile unsigned char *textRowPtr(unsigned short row) {
   volatile unsigned char *videoPtr = TERM_VIDEO_BASE;
   while (row--) {
-    videoPtr += kTextRowBytes;
+    videoPtr += TERM_TEXT_ROW_BYTES;
   }
   return videoPtr;
 }
 
 static void textClearRow(unsigned short row) {
   volatile unsigned char *dst = textRowPtr(row);
-  for (unsigned short i = 0; i < kTextRowBytes; ++i) {
+  for (unsigned short i = 0; i < TERM_TEXT_ROW_BYTES; ++i) {
     dst[i] = 0x00;
   }
 }
@@ -64,7 +72,7 @@ static void textClearRow(unsigned short row) {
 static void textCopyRow(unsigned short dstRow, unsigned short srcRow) {
   volatile unsigned char *src = textRowPtr(srcRow);
   volatile unsigned char *dst = textRowPtr(dstRow);
-  for (unsigned short i = 0; i < kTextRowBytes; ++i) {
+  for (unsigned short i = 0; i < TERM_TEXT_ROW_BYTES; ++i) {
     dst[i] = src[i];
   }
 }
@@ -140,6 +148,7 @@ static void textPutcRaw(char character) {
     }
     TERM_CURSOR_COL = cursorCol;
     TERM_CURSOR_ROW = cursorRow;
+    platform_poll();
     return;
   }
 
@@ -171,6 +180,7 @@ static void textPutcRaw(char character) {
 
   TERM_CURSOR_COL = cursorCol;
   TERM_CURSOR_ROW = cursorRow;
+  platform_poll();
 }
 
 static void textVt52DirectCursor(unsigned char rowCode, unsigned char colCode) {
@@ -299,12 +309,13 @@ void text_clear(void) {
     for (unsigned short col = 0; col < SCR_WIDTH_CHARS; ++col) {
       textPutSpaceAt(col, row);
     }
+    platform_poll();
   }
   text_set_cursor(0U, 0U);
 }
 
 void text_init(void) {
-  screen_clear();
+  term_screen_clear();
   text_set_color(1U);
 }
 
@@ -380,12 +391,6 @@ void text_putc(char character) {
   }
 
   textPutcRaw(character);
-}
-
-void text_puts(const char *text) {
-  while (*text) {
-    text_putc(*text++);
-  }
 }
 
 void text_build_title_line(char out[SCR_WIDTH_CHARS + 1],

@@ -1,3 +1,11 @@
+/**
+ * File: src/common/test.c
+ * Author: Diego Parrilla Santamaría
+ * Date: 2026-03-11
+ * Copyright: 2024-26 - GOODDATA LABS SL
+ * Description: Embedded test catalog and parameter data.
+ */
+
 #include "test.h"
 
 #if (defined(_DEBUG) && (_DEBUG > 0)) || (defined(_TEST) && (_TEST > 0)) || \

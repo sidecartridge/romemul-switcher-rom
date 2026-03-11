@@ -1,4 +1,4 @@
-.PHONY: st debug test clean format format-check tidy check
+.PHONY: st amiga debug test clean format format-check tidy check
 
 DEBUG ?= 0
 TEST ?= 0
@@ -20,6 +20,9 @@ endif
 st:
 	$(MAKE) -C src/st DEBUG=$(DEBUG) TEST=$(TEST) ROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL) STARTUP_ROM_ASM=$(STARTUP_ROM_ASM)
 
+amiga:
+	$(MAKE) -C src/amiga DEBUG=$(DEBUG) TEST=$(TEST) ROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL)
+
 debug:
 	$(MAKE) st DEBUG=1
 
@@ -40,3 +43,4 @@ check:
 
 clean:
 	$(MAKE) -C src/st clean
+	$(MAKE) -C src/amiga clean

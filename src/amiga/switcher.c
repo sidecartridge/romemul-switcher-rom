@@ -1,45 +1,45 @@
 /**
- * File: src/st/switcher.c
+ * File: src/amiga/switcher.c
  * Author: Diego Parrilla Santamaría
  * Date: 2026-03-11
  * Copyright: 2024-26 - GOODDATA LABS SL
- * Description: Atari ST ROM switcher entry point.
+ * Description: Amiga ROM switcher entry point.
  */
 
 #include "../common/chooser.h"
+#include "../common/kbd.h"
 #include "../common/palloc.h"
 #include "../common/text.h"
-#if defined(_DEBUG) && (_DEBUG > 0)
-#include "htrace.h"
-#endif
 #include "mem.h"
 #include "screen.h"
 
-enum {
-  kStatusRegisterIplMask = 0x0700U,
-  kIplLevelMask = 0x7U,
-  kIplShiftBits = 8U,
-  kPolledInterruptLevel = 7U,
-  kColorDefault = 1U
-};
+enum { kPolledInterruptLevel = 7U, kColorDefault = 1U };
 
 extern unsigned char _end;
+
+#if defined(_DEBUG) && (_DEBUG > 0)
+static void screen_trace_msg(const char *message) {
+  if (message != (const char *)0) {
+    text_printf("%s", message);
+  }
+}
+#endif
 
 static void setInterruptLevelMask(unsigned short maskLevel) {
   unsigned short statusRegister;
   __asm__ volatile("move.w %%sr,%0" : "=d"(statusRegister));
-  statusRegister = (unsigned short)((statusRegister &
-                                     (unsigned short)~kStatusRegisterIplMask) |
-                                    (unsigned short)((maskLevel & kIplLevelMask)
-                                                     << kIplShiftBits));
-  __asm__ volatile("move.w %0,%%sr" ::"d"(statusRegister) : "cc");
+  statusRegister =
+      (unsigned short)((statusRegister & (unsigned short)~0x0700U) |
+                       (unsigned short)((maskLevel & 0x7U) << 8U));
+  __asm__ volatile("move.w %0,%%sr" : : "d"(statusRegister) : "cc");
 }
 
 static unsigned long computeHeapBase(void) {
-  const unsigned long ramBase = ST_RAM_VARS_BASE_ADDR;
-  const unsigned long ramEnd = ST_RAM_VARS_BASE_ADDR + ST_RAM_VARS_SIZE_BYTES;
+  const unsigned long ramBase = AMIGA_RAM_VARS_BASE_ADDR;
+  const unsigned long ramEnd =
+      AMIGA_RAM_VARS_BASE_ADDR + AMIGA_RAM_VARS_SIZE_BYTES;
   unsigned long heapBase =
-      ST_RAM_VARS_BASE_ADDR + (unsigned long)ST_RAM_VARS_RESERVED_BYTES;
+      AMIGA_RAM_VARS_BASE_ADDR + AMIGA_RAM_VARS_RESERVED_BYTES;
   const unsigned long imageEnd = (unsigned long)&_end;
 
   if (imageEnd > heapBase && imageEnd < ramEnd) {
@@ -57,31 +57,25 @@ static unsigned long computeHeapBase(void) {
 
 void rom_switcher_main(void) {
   const unsigned long heapBase = computeHeapBase();
-  const unsigned long ramEnd = ST_RAM_VARS_BASE_ADDR + ST_RAM_VARS_SIZE_BYTES;
+  const unsigned long ramEnd =
+      AMIGA_RAM_VARS_BASE_ADDR + AMIGA_RAM_VARS_SIZE_BYTES;
   const unsigned long heapSize =
       (heapBase < ramEnd) ? (ramEnd - heapBase) : 0UL;
   pa_init(heapBase, heapSize);
 
-  /* Polled runtime: mask all IRQ levels (IPL=7). */
   setInterruptLevelMask(kPolledInterruptLevel);
 
-#if defined(_DEBUG) && (_DEBUG > 0)
-  hatari_trace_init();
-  hatari_trace_msg("[romswdbg] boot\n");
-#endif
-
   screen_init();
-
-  screen_set_display_palette();
   text_init();
 
   text_clear();
   text_set_color(kColorDefault);
 
 #if defined(_DEBUG) && (_DEBUG > 0)
-  chooser_loop(ROM_BASE_ADDR_UL, hatari_trace_msg, kColorDefault, "Atari ST");
+  chooser_loop(ROM_BASE_ADDR_UL, screen_trace_msg, kColorDefault,
+               "Amiga 500/2000");
 #else
   chooser_loop(ROM_BASE_ADDR_UL, (helper_trace_fn_t)0, kColorDefault,
-               "Atari ST");
+               "Amiga 500/2000");
 #endif
 }
