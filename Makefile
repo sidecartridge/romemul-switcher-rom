@@ -1,5 +1,8 @@
 .PHONY: st amiga debug test clean format format-check tidy check
 
+# Version from file
+VERSION := $(shell cat version.txt)
+
 DEBUG ?= 0
 TEST ?= 0
 STARTUP_ROM_ASM ?= startup_ste.s
@@ -44,3 +47,9 @@ check:
 clean:
 	$(MAKE) -C src/st clean
 	$(MAKE) -C src/amiga clean
+
+## Tag this version
+.PHONY: tag
+tag:
+	git tag $(VERSION) && git push origin $(VERSION) && \
+	echo "Tagged: $(VERSION)"
