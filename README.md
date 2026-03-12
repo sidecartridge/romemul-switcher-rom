@@ -12,6 +12,26 @@ This repository builds ROM-resident switcher binaries for:
 The runtime is fully freestanding. It does not call TOS, GEMDOS, BIOS, XBIOS,
 Kickstart, or AmigaOS. All platform code talks directly to the hardware.
 
+## How it works
+
+1. Download the ROM image that matches your computer model and ROM size:
+   - Atari ST/ Mega ST: `192 KB`
+   - Atari STE / Mega STE: `256 KB`
+   - Amiga 500/2000: `512 KB`
+2. Copy the downloaded `.img` file into the `ROMEMUL` folder of the device.
+3. Rename the `RESCUE.TXT` file so it points to that ROM image name.
+4. Safely eject the device from your computer.
+5. Enter Rescue Mode and boot the machine.
+
+Once the machine enters Rescue Mode, this ROM will boot and show up as the
+rescue ROM/switcher image.
+
+For Rescue Mode usage on the SidecarTridge TOS Emulator, see the [official
+guide](https://docs.sidecartridge.com/sidecartridge-tos/user-guideV2/#rescue-mode).
+
+For Rescue Mode usage on the SidecarTridge Kickstart Emulator, see the [official
+guide](https://docs.sidecartridge.com/sidecartridge-kickstart/user-guide/#rescue-mode).
+
 ## Status
 
 - Atari ST ROM build: active
