@@ -21,6 +21,7 @@ Kickstart, or AmigaOS. All platform code talks directly to the hardware.
 ## Highlights
 
 - Shared chooser, ROM protocol, allocator, and text rendering in `src/common/`
+- Shared full-ROM checksum verification in `src/common/rom_check.c`
 - Atari ST/STE hardware-specific code in `src/st/`
 - Amiga 500/2000 hardware-specific code in `src/amiga/`
 - Direct hardware keyboard handling on both platforms
@@ -97,14 +98,16 @@ Only canonical artifact names are published; timestamped variants are not genera
 - `dist/st/RSWIT192.PRG`
 - `dist/st/RESCUE_SWITCHER_v<version>_192KB.img`
 
-The final ROM image is zero-padded to exactly `192 KB`.
+The final ROM image is finalized to exactly `192 KB`, with random filler in
+unused ROM space and a 32-bit big-endian checksum in the last 4 bytes.
 
 ### Atari STE
 
 - `dist/ste/RSWIT256.PRG`
 - `dist/ste/RESCUE_SWITCHER_v<version>_256KB.img`
 
-The final ROM image is zero-padded to exactly `256 KB`.
+The final ROM image is finalized to exactly `256 KB`, with random filler in
+unused ROM space and a 32-bit big-endian checksum in the last 4 bytes.
 
 ### Amiga
 
@@ -112,7 +115,8 @@ The final ROM image is zero-padded to exactly `256 KB`.
 
 The Amiga image is always emitted as a full `512 KB` Kickstart-style ROM,
 including kickety-split/footer/checksum information, and is validated with
-`romtool`.
+`romtool`. Unused ROM space is filled with random data, and a dedicated
+32-bit big-endian checksum field is stored immediately before the footer.
 
 ## Release Workflow
 
@@ -134,6 +138,9 @@ including kickety-split/footer/checksum information, and is validated with
 - Runtime is fully polled and bare-metal
 - Keyboard input uses IKBD ACIA directly
 - Screen and glyph rendering are handled in `src/st/`
+- The title/model string is selected from the ROM base address:
+  - `Atari ST` for `0x00FC0000UL`
+  - `Atari STE` for `0x00E00000UL`
 
 ### Amiga 500 / 2000
 
@@ -150,8 +157,13 @@ including kickety-split/footer/checksum information, and is validated with
 - `src/common/text.c` implements the terminal-style text renderer used by both platforms
 - `src/common/chooser.c` contains the catalog parser and menu flow
 - `src/common/commands.c` contains the ROM-emulator protocol access
+- `src/common/rom_check.c` verifies the full ROM checksum before the chooser starts
 - `_TEST` builds use embedded catalog/parameter data from `src/common/test.c`
 - `text_run_feature_tests()` is intentionally kept in the tree
+
+At boot, ST/STE/Amiga compute a full-ROM checksum before entering the chooser.
+If verification fails, the stored and computed values are shown and the user is
+asked to press a key before continuing.
 
 ## Code Style Checks
 
@@ -172,6 +184,7 @@ These targets are implemented through `scripts/clang-checks.sh`.
 - Keep hardware details in `src/st` or `src/amiga`
 - Do not introduce TOS, GEMDOS, BIOS, XBIOS, Kickstart, or AmigaOS runtime dependencies
 - If you change memory layout constants, update startup and linker assumptions together
+- `version.txt` may contain a leading `v`; build logic strips it before generating artifact names
 - New `.c`, `.h`, and `.s` files should use the standard project file header block
 - Preferred validation after shared changes:
   - `./build.sh all`
