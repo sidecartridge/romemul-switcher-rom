@@ -12,6 +12,7 @@ This file documents the current project context for coding agents working on thi
 
 ## Current High-Level Architecture
 - `src/common/` contains the shared chooser, ROM protocol, allocator, text rendering, and shared platform interfaces.
+- `src/common/rom_check.c/.h` contains the shared ROM integrity check implementation.
 - `src/st/` contains Atari ST and STE hardware-specific code.
 - `src/amiga/` contains Amiga 500/2000 hardware-specific code.
 - Shared platform-facing interfaces now live in:
@@ -38,6 +39,7 @@ This file documents the current project context for coding agents working on thi
 - `build.sh` now publishes only canonical artifact names. Do not reintroduce timestamped artifact copies.
 - `ROM_BASE_ADDR_UL` has no Makefile default and must be passed by the caller or `build.sh`.
 - `version.txt` is the single version source. Both ST and Amiga Makefiles pass it as `-DAPP_VERSION_STR="..."`.
+- `version.txt` may include a leading `v`; build logic strips it before composing artifact filenames and `APP_VERSION_STR`.
 
 ## Platform Build Parameters
 - `st`
@@ -56,6 +58,7 @@ This file documents the current project context for coding agents working on thi
   - `commands.c/.h`: ROM-emulator command protocol, page/block reads, reset flow.
   - `palloc.c/.h`: freestanding bump allocator.
   - `text.c/.h`: terminal-style text output and VT52-like control handling.
+  - `rom_check.c/.h`: shared ROM checksum verification.
   - `font8x8.h`: shared 8x8 font data.
   - `test.c/.h`: embedded test catalog and parameter data used by `_TEST` builds.
 - `src/st/`
@@ -84,9 +87,14 @@ This file documents the current project context for coding agents working on thi
 - Final ROM image sizes are now exact, not generic 4 KB rounding:
   - `st` is padded to `192 KB`
   - `ste` is padded to `256 KB`
+- ST/STE ROM slack is no longer zero-filled. Unused bytes are filled with random data during post-build finalization.
+- ST/STE store a 32-bit big-endian checksum in the last 4 bytes of the ROM image.
 - The ST linker script generation in `src/st/Makefile` writes through a temp file and then renames it, to avoid stale `rom_abs.ld` content.
 - ST runtime remains fully polled and bare-metal.
 - Keyboard input uses IKBD ACIA directly and filters non-keyboard packets.
+- `src/st/switcher.c` derives the displayed model name from `ROM_BASE_ADDR_UL`:
+  - `0x00FC0000UL` -> `Atari ST`
+  - `0x00E00000UL` -> `Atari STE`
 
 ## Amiga Notes
 - Target machines are Amiga 500 and Amiga 2000.
@@ -95,6 +103,11 @@ This file documents the current project context for coding agents working on thi
   - base `0x00F80000`
   - kickety split marker at the midpoint
   - footer/checksum validated with `romtool`
+- Amiga ROM slack is filled with random data during post-build finalization.
+- Amiga stores a dedicated 32-bit big-endian checksum field immediately before the footer.
+- The Amiga runtime checksum excludes both:
+  - the dedicated stored checksum field
+  - the Kickstart checksum longword maintained by `romtool`
 - `startup.s` is critical:
   - it must clear the low-memory ROM overlay before touching RAM
   - it copies runtime code from ROM to RAM
@@ -130,6 +143,9 @@ This file documents the current project context for coding agents working on thi
 ## Text And UI Notes
 - `text_printf()` and the shared text path are still core to the menu UI.
 - `text_run_feature_tests()` must remain in the tree. Do not delete it, even if it is not auto-invoked.
+- Both ST and Amiga perform a full-ROM checksum verification before entering `chooser_loop()`.
+- The integrity screen shows a spinner while the checksum runs.
+- On mismatch, the stored and computed values are shown and boot continues only after a key press.
 - Supported control behavior includes cursor movement, erase/clear operations, save/restore cursor, wrap control, reverse video, and foreground color selection.
 - `ESC c n` is parsed but intentionally not implemented.
 - `ESC e` and `ESC f` cursor show/hide are intentionally not implemented.
@@ -168,9 +184,11 @@ This file documents the current project context for coding agents working on thi
 - If changing memory constants, update startup, linker, and runtime assumptions together.
 - For Amiga reset work, keep the true cold-reset stub in `startup.s` ROM code.
 - Avoid reintroducing removed diagnostic scaffolding such as `SCREEN_DIAG_STAGE`.
+- Do not rename `rom_check.c/.h` back to `rom_crc.c/.h`; the project now uses an additive checksum, not CRC32.
 - Always validate with:
   - `./build.sh <platform>`
 - When changing shared code, build matrices should include:
   - `./build.sh all`
   - `./build.sh all debug`
   - `./build.sh all test`
+- Do not run `st` and `ste` builds in parallel against the same worktree; both publish through `build/st/`.
