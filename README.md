@@ -18,6 +18,7 @@ Kickstart, or AmigaOS. All platform code talks directly to the hardware.
    - Atari ST/ Mega ST: `192 KB`
    - Atari STE / Mega STE: `256 KB`
    - Amiga 500/2000: `512 KB`
+   - Latest releases: <https://github.com/sidecartridge/romemul-switcher-rom/releases>
 2. Copy the downloaded `.img` file into the `ROMEMUL` folder of the device.
 3. Rename the `RESCUE.TXT` file so it points to that ROM image name.
 4. Safely eject the device from your computer.
