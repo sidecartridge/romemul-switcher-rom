@@ -45,7 +45,7 @@ BUILD_CONFIG_STAMP := $(BUILD_DIR)/.build_config
 CC := m68k-atari-mint-gcc
 AS := m68k-atari-mint-gcc
 
-APP_VERSION := $(strip $(shell if [ -f ../../version.txt ]; then tr -d '\r\n' < ../../version.txt; else echo 0.0.0; fi))
+APP_VERSION := $(strip $(shell if [ -f ../../version.txt ]; then tr -d '\r\n' < ../../version.txt | sed 's/^[vV]//'; else echo 0.0.0; fi))
 ROM_IMAGE_NAME := RESCUE_SWITCHER_v$(APP_VERSION).img
 TARGET_ROM_BIN := $(BUILD_DIR)/$(ROM_IMAGE_NAME)
 NO_EXT_LIB_FLAGS := -nostdlib -nodefaultlibs -nostartfiles
@@ -54,7 +54,7 @@ CFLAGS := -m68000 -std=gnu99 -ffreestanding -fomit-frame-pointer $(OPT_FLAGS) -W
 ASFLAGS := -m68000 -x assembler-with-cpp $(NO_EXT_LIB_FLAGS) $(DEBUG_DEFS) $(TEST_DEFS) -DROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL)
 LDFLAGS_ROM := $(NO_EXT_LIB_FLAGS) -Wl,-Map=$(TARGET_MAP),-T,$(ROM_LDSCRIPT),--oformat,binary
 
-SRCS_C := switcher.c text.c screen.c kbd.c glyph.c platform.c palloc.c commands.c chooser.c
+SRCS_C := switcher.c text.c screen.c kbd.c glyph.c platform.c palloc.c commands.c chooser.c rom_check.c
 ifeq ($(TEST),1)
 SRCS_C += test.c
 endif
