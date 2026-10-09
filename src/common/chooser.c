@@ -13,6 +13,7 @@
 #include "palloc.h"
 #include "test.h"
 #include "text.h"
+#include "trace.h"
 
 enum {
   kScreenWidthChars = 80,
@@ -54,8 +55,8 @@ static void copy_name(char dst[kRomNameSize], const unsigned char *src) {
   dst[i] = '\0';
 }
 
-static int parse_rom_description(unsigned char *rom_desc_raw,
-                                 unsigned char *rom_params_raw,
+static int parse_rom_description(const unsigned char *rom_desc_raw,
+                                 const unsigned char *rom_params_raw,
                                  rom_catalog_t **rom_desc) {
   unsigned long default_rom_index =
       (unsigned long)rom_params_raw[kDefaultRomIndex] |
@@ -75,6 +76,8 @@ static int parse_rom_description(unsigned char *rom_desc_raw,
     count++;
     scan_offset += kRomDescriptionSize;
   }
+  TRACE("list %d entries default=%lu rescue=%lu", count, default_rom_index,
+        rescue_rom_index);
 
   if (count <= 0) {
     *rom_desc = (rom_catalog_t *)0;
@@ -315,13 +318,16 @@ static int display_paginated_content(char *file_array, int num_files,
       text_set_cursor(0, -1 + current_line + 2 + i - start_index);
       deleteLineFromCursor();
     }
+    TRACE("page %d of %d drawn", page_number + 1, max_page + 1);
 
     unsigned char key;
     unsigned short change_page = 0U;
     while ((selected_rom < 0) && (!change_page)) {
       highlight_and_print(file_array, (unsigned short)current_index,
                           (unsigned short)start_index, current_line, 1U);
+      TRACE("waitkey index %d page %d", current_index, page_number + 1);
       key = kbd_poll_scancode_wait();
+      TRACE("key 0x%02x index %d", (unsigned int)key, current_index);
       switch (key) {
         case KEY_UP_ARROW:
           if (current_index > start_index) {
@@ -457,11 +463,14 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
 
   char *file_array = create_file_array(rom_descriptions, num_entries);
 
+  TRACE("protocol 0x%04x", (unsigned int)(unsigned short)protocol_version);
   if (protocol_version != kSwitcherTosProtocolVersion) {
     text_printf(
         "This version of SWITCHER tool is not compatible with the firmware of "
         "the device.\r\n");
     text_printf("Press any key to exit...\r\n");
+    TRACE("protocol mismatch");
+    TRACE("waitkey");
     kbd_wait_for_key_press();
     return;
   }
@@ -478,6 +487,8 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
       text_printf(
           "No ROMs found. Do you have a Sidecartrige device configured?\r\n");
       text_printf("Press any key to exit...\r\n");
+      TRACE("no roms");
+      TRACE("waitkey");
       kbd_wait_for_key_press();
       return;
     } else {
@@ -498,11 +509,17 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
           "Press any key to load the ROM image and reset the computer (ESC to "
           "cancel).\r");
 
+      TRACE("confirm %d %s", rom_number - 1,
+            rom_descriptions[rom_number - 1].name);
+      TRACE("waitkey");
       confirm_key = kbd_wait_for_key_or_esc();
       if (confirm_key == KEY_ESC) {
+        TRACE("select cancelled");
         rom_number = 0;
         continue;
       }
+      TRACE("select %d %s", rom_number - 1,
+            rom_descriptions[rom_number - 1].name);
 
       flow_control = 1;
     }
@@ -510,5 +527,6 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
 
   deleteLineFromCursor();
   text_printf("Rebooting the computer with the new ROM...");
+  TRACE("reset rom %d", rom_number - 1);
   send_change_rom_command_and_hard_reset((unsigned char)(rom_number - 1));
 }

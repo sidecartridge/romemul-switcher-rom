@@ -14,6 +14,31 @@ static inline unsigned long pack_00f8(unsigned short value) {
   return 0x00F80000UL | (unsigned long)value;
 }
 
+#if defined(_DEBUG) && (_DEBUG > 0)
+/* The trace channel of debug builds: Paula's serial port, which FS-UAE maps
+   to a host pseudo-terminal (EPIC-00 STORY-02). The same register sequence as
+   sidecartos-config's EmuTOS-on-Amiga debug build. */
+enum {
+  kSerperPal115200 = 30U, /* 3,546,895 Hz / (30 + 1): about 115,200 baud */
+  kSerdatrTxBufferEmpty = 0x2000U,
+  kSerdatStopBit = 0x0100U
+};
+
+void platform_trace_init(void) { AMIGA_SERPER = kSerperPal115200; }
+
+void platform_trace_write(const char *text) {
+  if (text == (const char *)0) {
+    return;
+  }
+  while (*text != '\0') {
+    while ((AMIGA_SERDATR & kSerdatrTxBufferEmpty) == 0U) {
+    }
+    AMIGA_SERDAT = (unsigned short)(kSerdatStopBit | (unsigned char)*text);
+    text++;
+  }
+}
+#endif
+
 unsigned long platform_get_system_time_seed(void) {
   return *(volatile unsigned long *)0x00000004UL;
 }

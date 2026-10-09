@@ -8,6 +8,7 @@
 
 #include "screen.h"
 
+#include "../common/trace.h"
 #include "mem.h"
 #include "palette.h"
 
@@ -60,6 +61,7 @@ void screen_init(void) {
   } else {
     ST_SHIFTER_MODE = kShifterModeHi; /* 640x400, monochrome */
   }
+  TRACE("screen %s", (gpip & kMonitorColorDetectBit) ? "medium" : "mono");
 
   ST_SHIFTER_BASE_HI = (unsigned char)((base >> kByteShiftHigh) & kByteMask);
   ST_SHIFTER_BASE_MID = (unsigned char)((base >> kByteShiftMid) & kByteMask);

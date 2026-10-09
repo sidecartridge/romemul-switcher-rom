@@ -2,7 +2,7 @@
 id: EPIC-00
 iteration: 1
 title: A test harness on Hatari and FS-UAE that boots the ROM images
-status: todo
+status: done
 ---
 
 ## Goal
@@ -20,10 +20,11 @@ so the emulators boot our image directly: no TOS, no AmigaOS, no disk, no GEMDOS
 
 ## Scope
 
-- In scope: the groundwork in the ROM (debug builds that link, a debug+test image for each
-  platform, a build ID, a trace channel each emulator can capture, fixed-prefix trace lines,
-  keys over the serial port on the Amiga); `build.sh` fixes so debug and test output never reach
-  `dist/`, and a pinned toolchain image; a Hatari harness, in colour and in mono; an FS-UAE
+- In scope: out-of-tree builds from pinned tools with a build ID, as sidecartos-config's
+  `tools/dev/build.sh` does, and a `build.sh` whose release path shares them and never writes
+  debug or test output to `dist/`; the groundwork in the ROM (debug builds that link, a
+  debug+test image for each platform, a trace channel each emulator can capture, fixed-prefix
+  trace lines, keys over the serial port on the Amiga); a Hatari harness, in colour and in mono; an FS-UAE
   harness; one script that runs everything; sizes; documentation.
 - Out of scope: emulating the SidecarTridge (C-03); the bus protocol, the selection, the reset
   and power-on timing, which stay hardware-only (C-01); the candidate fixes in `ITERATIONS.md`,
@@ -38,14 +39,20 @@ this Mac that Diego watches and agrees with, not a bench pass.
 
 ## Stories
 
-- STORY-01: ROM groundwork for the harnesses
-- STORY-02: Builds the harness can trust
+- STORY-01: Builds the harness can trust
+- STORY-02: ROM groundwork for the harnesses
 - STORY-03: The Hatari harness
 - STORY-04: The FS-UAE harness
 - STORY-05: Run every image, measure, document
 - STORY-06: Verification (Diego's checkpoint)
 
 ## Notes
+
+**Closing, 2026-10-09.** Every story done. `tools/dev/all_harness.sh` runs nine sessions on the
+three images in about a minute, builds included, and fails at the right step on a deliberate
+break; STORY-06 was run by Claude at Diego's request. The `--interactive` looks were taken out
+of STORY-03, STORY-04 and STORY-06 by Diego and moved to EPIC-01, before the release gate.
+Code uncommitted on `epic-00-emulator-harness`, cut from `release/v4.0.0` (`ded4ba0`).
 
 **What this Mac has (2026-10-09):**
 

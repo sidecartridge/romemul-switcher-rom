@@ -24,4 +24,10 @@ void text_set_color(unsigned char color);
 void text_putc(char character);
 void text_build_title_line(char out[SCR_WIDTH_CHARS + 1], const char *computer_model);
 int text_printf(const char *fmt, ...);
+#if defined(_DEBUG) && (_DEBUG > 0)
+/* text_printf()'s formatter writing into out[size], always terminated.
+   Debug builds only: the trace uses it (trace.c). */
+int text_vsnprintf(char *out, unsigned long size, const char *fmt,
+                   __builtin_va_list args);
+#endif
 unsigned short text_run_feature_tests(void);

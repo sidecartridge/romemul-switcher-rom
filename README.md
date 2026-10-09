@@ -47,7 +47,8 @@ guide](https://docs.sidecartridge.com/sidecartridge-kickstart/user-guide/#rescue
 - Amiga 500/2000 hardware-specific code in `src/amiga/`
 - Direct hardware keyboard handling on both platforms
 - `80`-column menu on Amiga using hires `2`-bitplane display (`4` colors)
-- Toolchain lives in Docker through [`stcmd`](https://github.com/sidecartridge/atarist-toolkit-docker)
+- Toolchain lives in Docker: the pinned [`atarist-toolkit-docker`](https://github.com/sidecartridge/atarist-toolkit-docker)
+  image builds all three images, and a small pinned image runs `romtool` and the image finalizer
 
 ## Repository Layout
 
@@ -57,25 +58,31 @@ romemul-switcher-rom/
 ├── LICENSE
 ├── Makefile
 ├── README.md
-├── build.sh
+├── build.sh               # release build: publishes to dist/
 ├── dist/                  # published artifacts
+├── docs/epics/            # backlog: iterations, epics, stories, decisions
+├── scripts/               # finalize_rom.py, clang-checks.sh
 ├── src/
 │   ├── amiga/             # Amiga 500/2000 platform code
 │   ├── common/            # shared chooser/text/protocol code
 │   └── st/                # Atari ST/STE platform code
-└── build/                 # intermediate build outputs
+├── tools/dev/             # out-of-tree builds and pinned toolchain images
+└── build/                 # intermediate outputs of a direct `make`
 ```
 
 ## Requirements
 
 1. Docker Desktop or compatible container runtime
-2. `stcmd` from
-   [`atarist-toolkit-docker`](https://github.com/sidecartridge/atarist-toolkit-docker/releases/latest)
-3. POSIX shell environment on macOS, Linux, or WSL2
+2. `git` and `bash` on macOS, Linux, or WSL2
+
+The toolchain images are pulled or built on first use: the Atari GCC image
+`logronoide/atarist-toolkit-docker-x86_64:1.4.0`, pinned by digest, and
+`romemul-switcher-rom/romtool:1` (amitools 0.8.1), built from
+`tools/dev/docker/romtool/`. Both are named in `tools/dev/toolchain.sh`.
 
 ## Build
 
-Platform is mandatory unless you use `all`.
+Release images, published to `dist/<platform>/`. Platform is mandatory unless you use `all`.
 
 ```bash
 ./build.sh st
@@ -84,16 +91,18 @@ Platform is mandatory unless you use `all`.
 ./build.sh all
 ```
 
-Optional build modes:
+Debug and test images are built out of tree into `tools/dev/builds/<platform>-<type>/` and
+never reach `dist/`:
 
 ```bash
-./build.sh st debug
-./build.sh ste test
-./build.sh amiga debug
-./build.sh amiga test
-./build.sh all debug
-./build.sh all test
+tools/dev/build.sh st debug        # -O0 -g, trace on
+tools/dev/build.sh ste test        # catalog and parameters from src/common/test.c
+tools/dev/build.sh amiga debug-test
+tools/dev/build.sh st release      # a release image, without publishing it
 ```
+
+Every build carries a build ID: the commit, `-dirty.<hash>` when the sources differ from it,
+and `+debug` or `+test`.
 
 Platform build parameters:
 
@@ -111,7 +120,7 @@ Platform build parameters:
 
 ## Artifacts
 
-Release artifacts are published under `dist/<platform>/` when `test` is not enabled.
+Release artifacts are published under `dist/<platform>/` by `./build.sh` only.
 Only canonical artifact names are published; timestamped variants are not generated.
 
 ### Atari ST
@@ -207,10 +216,10 @@ These targets are implemented through `scripts/clang-checks.sh`.
 - If you change memory layout constants, update startup and linker assumptions together
 - `version.txt` may contain a leading `v`; build logic strips it before generating artifact names
 - New `.c`, `.h`, and `.s` files should use the standard project file header block
-- Preferred validation after shared changes:
-  - `./build.sh all`
-  - `./build.sh all debug`
-  - `./build.sh all test`
+- Preferred validation after any change:
+  - `tools/dev/all_harness.sh`: builds the three debug+test images and runs them in Hatari
+    and FS-UAE (see `tools/dev/README.md`)
+  - `tools/dev/build.sh <platform> release` for each of `st`, `ste` and `amiga`
 
 ## License
 
