@@ -19,7 +19,7 @@ enum {
   kPaginatedContentYOffset = 5,
   kMetadataFlagActive = 0x1U,
   kMetadataFlagRescue = 0x2U,
-  kSwitcherTosProtocolVersion = 0x0031,
+  kSwitcherTosProtocolVersion = 0x0040,
   kRomNameSize = 64,
   kRomDescriptionSize = 256,
   kRomCompressedClusterSize = 184,
