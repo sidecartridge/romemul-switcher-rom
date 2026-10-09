@@ -53,7 +53,7 @@ guide](https://docs.sidecartridge.com/sidecartridge-kickstart/user-guide/#rescue
 
 ```text
 romemul-switcher-rom/
-├── AGENTS.md
+├── CLAUDE.md
 ├── LICENSE
 ├── Makefile
 ├── README.md
