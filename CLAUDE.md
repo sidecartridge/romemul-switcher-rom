@@ -38,7 +38,7 @@ Facts the siblings rely on that are easy to break here:
 - Parameters-page bytes 516 to 532 hold the `CONFIG.TXT` words that only the host switcher reads. Bytes 536 to 767 may hold stray data on a device.
 - The firmware rejects a rescue ROM above 512 KB. Debug firmware holds at most 496 KB in SRAM (firmware D-16), so test the 512 KB Amiga image with release firmware.
 
-One source tree produces **three ROM images**, selected by `ROM_BASE_ADDR_UL` (no Makefile default; `build.sh` passes it):
+One source tree produces **three ROM images**, selected by `ROM_BASE_ADDR_UL` (no Makefile default; `tools/dev/build.sh` passes it):
 
 | platform | `ROM_BASE_ADDR_UL` | startup asm | image | notes |
 |---|---|---|---|---|
@@ -48,24 +48,29 @@ One source tree produces **three ROM images**, selected by `ROM_BASE_ADDR_UL` (n
 
 `st` and `ste` share `src/st/`; `src/st/switcher.c` derives the displayed model name from `ROM_BASE_ADDR_UL` (`0x00FC0000UL` → "Atari ST", `0x00E00000UL` → "Atari STE"). The ST build also emits a `ROMSWITC.PRG` (linked via `start.s`) that runs the same code as a TOS program for quick testing in Hatari. `start.s` is the **only** place allowed to touch the OS: it calls GEMDOS `Super(0)` when not already in supervisor mode, then never returns to TOS.
 
-`version.txt` is the single version source (`v4.0.0`; a leading `v` is stripped by `build.sh` and both Makefiles before it becomes `-DAPP_VERSION_STR` and the artifact names). `CHANGELOG.md` is read by the release workflow up to the first `---` line.
+`version.txt` is the single version source (`v4.0.0`; a leading `v` is stripped by the build scripts and both Makefiles before it becomes `-DAPP_VERSION_STR` and the artifact names). `CHANGELOG.md` is read by the release workflow up to the first `---` line.
 
 ## Common commands
 
 ```bash
-./build.sh st            # one platform: st | ste | amiga  (release image + dist/ publish)
-./build.sh all           # st, ste, amiga sequentially; replaces dist/, so tell the firmware first (C-06)
-./build.sh st debug test # -O0 -g -D_DEBUG=1 with the fake flash; never `debug` alone (see gotchas)
-./build.sh all test      # -D_TEST=1: catalog/params from src/common/test.c, no dist/ publish
-make clean               # removes build/st* and build/amiga*
-make format-check        # clang-format dry run over src/**/*.{c,h}
-make tidy                # clang-tidy over src/**/*.c
-make check               # format-check + tidy
-make tag                 # git tag + push v<version.txt>; triggers the release workflow
-./docs/epics/cockpit.sh  # regenerate docs/epics/STATUS.md after editing an epic or story
+tools/dev/build.sh st release      # out of tree into tools/dev/builds/st-release/; never touches dist/
+tools/dev/build.sh ste debug-test  # types: release | debug | test | debug-test; platforms: st | ste | amiga
+./build.sh st                      # release build, published to dist/st/ (st | ste | amiga | all)
+./build.sh all                     # replaces dist/, so tell the firmware first (C-06)
+tools/dev/romtool.sh info <img>    # the pinned romtool (amitools 0.8.1), repo-relative paths
+tools/dev/all_harness.sh           # build the 3 debug-test images, run 9 Hatari/FS-UAE sessions (~1 min)
+python3 tools/dev/hatari_harness.py --image ste --machine megaste   # one session; also --monitor mono, --corrupt
+python3 tools/dev/fsuae_harness.py # the Amiga session over the serial port; also --corrupt, --no-warp
+tools/dev/measure_builds.sh        # payload and free space of every image, as a Markdown table
+make clean                         # removes build/st* and build/amiga* (outputs of a direct make)
+make format-check                  # clang-format dry run over src/**/*.{c,h}
+make tidy                          # clang-tidy over src/**/*.c
+make check                         # format-check + tidy
+make tag                           # git tag + push v<version.txt>; triggers the release workflow
+./docs/epics/cockpit.sh            # regenerate docs/epics/STATUS.md after editing an epic or story
 ```
 
-There is no unit-test suite. "Tests" are the `test` build mode (embedded data instead of the bus) and running the resulting `build/st/ROMSWITC.PRG` or the `.img` in Hatari / an Amiga emulator. After touching `src/common`, validate with `./build.sh all test` and `./build.sh all debug test`, which leave `dist/` alone; run a release `./build.sh all` only when the firmware session has been told (C-06). EPIC-00 adds the emulator harnesses that will become the gate.
+There is no unit-test suite. The gate is the emulator harnesses (D-06; `tools/dev/README.md`): **every code change runs `tools/dev/all_harness.sh`** and builds the release images with `tools/dev/build.sh <platform> release`, before it reaches Diego's bench. The harnesses boot the debug+test images as the system ROM of Hatari (ST, Mega ST, STE, Mega STE, colour and mono) and FS-UAE (A500), drive the chooser and read the `@@` trace. A PASS says nothing about the bus, the flash, the selection on a real device or power-on timing (C-03). Run `./build.sh` only when the firmware session has been told (C-06).
 
 ## Code organisation
 
@@ -141,27 +146,29 @@ Platform-facing interfaces are `glyph.h`, `kbd.h`, `platform.h`, `term.h`; `src/
 
 ## Build internals
 
-Toolchain is Docker-based via `stcmd` (from `atarist-toolkit-docker`); `m68k-atari-mint-gcc` compiles **both** the ST and the Amiga targets with `-m68000 -std=gnu99 -ffreestanding -nostdlib -Wall -Wextra -Werror`. `romtool` (amitools) and `python3` are needed on the host for the Amiga finalisation. Nothing compiles natively.
+The toolchain is Docker-based and pinned in `tools/dev/toolchain.sh`, the same arrangement as sidecartos-config's (EPIC-00 STORY-01). `logronoide/atarist-toolkit-docker-x86_64:1.4.0`, pinned by digest, provides GCC 4.6.4 and binutils 2.30; `m68k-atari-mint-gcc` compiles **all three** images with `-m68000 -std=gnu99 -ffreestanding -nostdlib -Wall -Wextra -Werror`. `romemul-switcher-rom/romtool:1` (amitools 0.8.1 on a pinned `python:3.12-slim`, built from `tools/dev/docker/romtool/` on first use) runs `scripts/finalize_rom.py` and `romtool`. Nothing compiles natively, and the host needs only Docker, git and bash.
 
-`build.sh` picks the platform parameters, runs `stcmd make st|amiga …`, finalises the image and publishes to `dist/<platform>/`. **Never run `st` and `ste` in parallel** in the same worktree: both publish through `build/st/`.
+`tools/dev/build.sh <platform> <type>` empties `tools/dev/builds/<platform>-<type>/` inside the container, runs `make -C src/st|amiga` with `BUILD_DIR` there and the build ID, then finalizes in the romtool container. The output folder holds the finalized `RESCUE_SWITCHER_v<ver>_<size>KB.img`, `ROMSWITC.PRG` for ST/STE, the link maps, and `obj/`. `./build.sh` is the release path: it calls `tools/dev/build.sh <platform> release` and copies the published files to `dist/<platform>/`; it refuses `debug` and `test`.
 
-Build directories: `build/st`, `build/st-debug`, `build/st-test`, `build/st-debug-test` (and the `amiga*` equivalents). Debug/test ST builds are copied back to `build/st/ROMSWITC.*` so tooling that always loads that path gets the selected mode. Internal 8.3 names are enforced: `ROMSWITC.PRG/.BIN/.MAP` (release), `ROMSWDBG.*` (debug), `ROMSWROM.MAP` (ROM link map), `ROMSWAMI.MAP` / `ROMAMDBG.MAP` (Amiga).
+The **build ID** is `<sha7>`, then `-dirty.<diff7>` when `src/`, `Makefile` or `version.txt` differ from HEAD, then `+debug`, `+test` or `+debug+test`. It is computed on the host by `rescue_build_id` and reaches C as `BUILD_ID_STR`; a direct `make` gets `unknown`.
+
+Internal 8.3 names are enforced: `ROMSWITC.PRG/.BIN/.MAP` (release), `ROMSWDBG.*` (debug), `ROMSWROM.MAP` (ROM link map), `ROMSWAMI.MAP` / `ROMAMDBG.MAP` (Amiga). A direct `make` writes to `build/st`, `build/st-debug`, `build/st-test`, `build/st-debug-test` and the `amiga*` equivalents, unfinalized.
 
 | mode | flags | effect |
 |---|---|---|
 | default | `-O2` | real hardware path |
 | `debug` | `-O0 -g -D_DEBUG=1` | Hatari NatFeats tracing on ST (`htrace.c`), extra `text_printf` diagnostics |
-| `test` | `-D_TEST=1 -DTEST=1` | catalog/params reads come from `src/common/test.c` arrays instead of the bus; the ST Makefile builds only the PRG/BIN (no ROM image); no `dist/` publish. The embedded params carry the protocol version at byte 512, so bump it together with `kSwitcherTosProtocolVersion` |
+| `test` | `-D_TEST=1 -DTEST=1` | catalog/params reads come from `src/common/test.c` arrays instead of the bus. The arrays are `const`, which this a.out toolchain puts in `test.c.o`'s `.text`, and both `rom_abs.ld.S` route that file to a `.romdata` section in ROM, so the RAM layout matches a release build. The embedded params carry the protocol version at byte 512, so bump it together with `kSwitcherTosProtocolVersion` |
 
-**Image finalisation** (in `build.sh`, Python one-liners): pad to the exact size (192/256/512 KB) with **random bytes**, never zeros; then write the 32-bit big-endian additive checksum. ST/STE: field at `size-4`. Amiga: payload must end before the **kickety-split** marker at `0x40000` (checked against `__rom_payload_end` in the map), random fill on both sides of it, checksum field at `0x7FFE4` excluding the 4-byte Kickstart checksum at `0x7FFE8`, then `romtool copy -c` fixes the footer and `romtool info` validates. Published artifacts use only canonical names (`RSWIT192.PRG`, `RSWIT256.PRG`, `RESCUE_SWITCHER_v<ver>_<size>KB.img`); do not reintroduce timestamped copies.
+**Image finalisation** (`scripts/finalize_rom.py`, run in the romtool container): pad to the exact size (192/256/512 KB) with **random bytes**, never zeros; then write the 32-bit big-endian additive checksum. ST/STE: field at `size-4`. Amiga: payload must end before the **kickety-split** marker at `0x40000` (checked against `__rom_payload_end` in the map), random fill on both sides of it, checksum field at `0x7FFE4` excluding the 4-byte Kickstart checksum at `0x7FFE8`, then `romtool copy -c` fixes the footer and `romtool info` validates. Published artifacts use only canonical names (`RSWIT192.PRG`, `RSWIT256.PRG`, `RESCUE_SWITCHER_v<ver>_<size>KB.img`); do not reintroduce timestamped copies.
 
-Direct `make` needs the same variables `build.sh` passes:
+A direct `make` needs the variables `tools/dev/build.sh` passes, for example:
 
 ```bash
 STCMD_NO_TTY=1 ST_WORKING_FOLDER=$PWD stcmd make st ROM_BASE_ADDR_UL=0x00E00000UL STARTUP_ROM_ASM=startup_ste.s
 ```
 
-Adding a `.c` file: append it to `SRCS_C` in `src/st/Makefile` and/or `src/amiga/Makefile` (explicit lists, `VPATH` covers `../common`). Header dependencies for `.c.o` targets are also listed by hand there.
+Adding a `.c` file: append it to `SRCS_C` in `src/st/Makefile` and/or `src/amiga/Makefile` (explicit lists, `VPATH` covers `../common`). Header dependencies are generated by the compiler (`-MMD -MP`, included at the end of each makefile), and the build-config stamp carries the version and the build ID, so changing either rebuilds everything.
 
 **Code style checks**: `make format`, `make format-check`, `make tidy`, `make check` run `scripts/clang-checks.sh` over `src/**/*.{c,h}` with the repo `.clang-format` (Google-based, 2-space) and `.clang-tidy`. It looks for LLVM under `/usr/local/opt/llvm/bin` first, else `PATH`, and needs `rg`. `.clang-tidy-ignore` was copied from the firmware repo and lists paths that do not exist here.
 
@@ -170,9 +177,11 @@ Adding a `.c` file: append it to `SRCS_C` in `src/st/Makefile` and/or `src/amiga
 ## Conventions and gotchas
 
 - **Source header block**: every `.c`, `.h`, `.s` under `src/` starts with the `File / Author / Date / Copyright / Description` comment block (see `src/common/rom_check.c`). Keep it on new files.
-- **Freestanding discipline**: no libc, no OS traps, no `LIBS`, and **no libgcc**. A 32-bit `/` or `%` that GCC cannot fold becomes a call to `___udivsi3` / `___umodsi3` and the link fails with "undefined reference" (at `-O2` it is usually folded away, at `-O0` it is not, so this shows up only in `debug` builds). Use shifts/masks for powers of two or the hand-written `div_u32_u16` in `commands.c`; likewise `copy_bytes` and the byte-swap helpers instead of `<string.h>`. As of v4.0.0 `rom_check.c` line 41 uses `%` and **every `debug` build fails to link** until that is changed.
-- **`build.sh` re-finalizes stale ST images**: the last step finalizes `build/st/RESCUE_SWITCHER_v<ver>.img` whenever it exists, in every mode. A `test` build (which produces no ROM image) run after a release build therefore fails with "payload overlaps the checksum field". Run `test` builds first, or delete that file, before `./build.sh st|ste test`. `dist/` also keeps images from earlier versions; only the current version's names are cleaned.
-- **`./build.sh <platform> debug` publishes to `dist/`**: `build.sh` publishes whenever the build is not a `test` build, so a debug image would replace the release image the firmware pinned (C-06). It has not happened only because debug builds fail to link today. Until EPIC-00 STORY-02 fixes it, build debug images only together with `test`.
+- **Freestanding discipline**: no libc, no OS traps, no `LIBS`, and **no libgcc**. A 32-bit `/` or `%` that GCC cannot fold becomes a call to `___udivsi3` / `___umodsi3` and the link fails with "undefined reference" (at `-O2` it is usually folded away, at `-O0` it is not, so this shows up only in `debug` builds). Use shifts/masks for powers of two or the hand-written `div_u32_u16` in `commands.c`; likewise `copy_bytes` and the byte-swap helpers instead of `<string.h>`. Build every change with `debug-test` too, which compiles at `-O0`.
+- **No named sections**: the objects are a.out, so `__attribute__((section(...)))` fails with "section attributes are not supported for this target". Place data by file name in the linker scripts instead, as `.romdata` does for `test.c.o`.
+- **Trace lines** (`src/common/trace.h`): `TRACE("fmt", ...)` prints `@@ <line>` in debug builds and compiles to nothing in release. The harnesses match these lines exactly, so changing one means changing `tools/dev/harness_common.py` too. Every blocking key read is preceded by `TRACE("waitkey...")`.
+- **Docker file sharing on macOS**: a file the host writes into a folder a container has just recreated can stay invisible to the next container for a while. Keep write-then-read steps on the container side, as `tools/dev/build.sh` does with the finalizer.
+- `dist/` keeps images of earlier versions; `./build.sh` replaces only the current version's files.
 - **Word alignment**: the 68000 faults on odd word access; keep buffers that are read as `unsigned short`/`unsigned long` aligned (the `palloc` heap base is rounded to 4).
 - **Endianness**: the Pico stores catalog/params little-endian; `read_flash_page(..., ENDIAN_BIG)` swaps words, and `chooser.c` still reads multi-byte fields byte-wise. Mirror what the firmware expects when adding a field.
 - **Memory constants**: changing anything in `mem.h` means updating the startup asm and `rom_abs.ld.S` together, on both platforms if shared.
@@ -195,12 +204,13 @@ not committed until Diego says so. Branches (D-05): the version lives on `releas
 epic on `epic-NN-<slug>` cut from it and merged back by pull request, and the release branch is
 merged into `main`, where the `v4.0.0` tag is pushed.
 
-Iteration 1 is v4.0.0. Its first epic is EPIC-00, the Hatari and FS-UAE harness that boots the
-three images as system ROMs (D-06). The open defects found on 2026-10-09 are listed as
+Iteration 1 is v4.0.0: EPIC-00, the Hatari and FS-UAE harness that boots the three images as
+system ROMs (D-06), done; EPIC-01, Diego's look at every screen with `--interactive`; EPIC-02,
+the release gate (notes, CI, merges, the `v4.0.0` tag, the firmware's re-pin). The open defects found on 2026-10-09 are listed as
 candidates in `ITERATIONS.md`: the constant nonce, the Amiga reset racing the firmware reboot
 (C-07), the mono cold boot on ST/STE, the unbounded catalog walk, and a debug image on hardware.
-EPIC-00 also fixes the debug link failure and the two `build.sh` flaws described under
-Conventions and gotchas.
+EPIC-00 STORY-01 moved every build out of tree (`tools/dev/build.sh`), which ended the two
+`build.sh` flaws: debug images published to `dist/`, and stale images re-finalized.
 
 ## Working style
 
@@ -243,7 +253,7 @@ Define success criteria. Loop until verified.
 - "Fix the bug" → "Write a test that reproduces it, then make it pass"
 - "Refactor X" → "Ensure tests pass before and after"
 
-For multi-step tasks, state a brief plan with a verification check per step. For this repo the check is `./build.sh <platform> test` and `./build.sh <platform> debug test`; after touching `src/common`, run both for `all`. A release build replaces `dist/`, so tell the firmware first (C-06).
+For multi-step tasks, state a brief plan with a verification check per step. For this repo the check is `tools/dev/all_harness.sh` (it builds the debug-test images itself) plus `tools/dev/build.sh <platform> release` for `st`, `ste` and `amiga`. `./build.sh` replaces `dist/`, so tell the firmware first (C-06).
 
 ### 5. No AI attribution
 

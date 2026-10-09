@@ -6,3 +6,4 @@ dist/
 *.o
 *.lst
 .DS_Store
+__pycache__/

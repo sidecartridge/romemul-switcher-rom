@@ -32,6 +32,65 @@ enum {
 
 static unsigned char kbdInitialized = 0U;
 
+#if defined(_DEBUG) && (_DEBUG > 0)
+/*
+ * Debug builds also take keys from Paula's serial port, which is how the
+ * FS-UAE harness types: FS-UAE has no other way to inject keys (EPIC-00
+ * STORY-02). One byte per key: 0x1B ESC, 0x0D RETURN, 0x80 to 0x83 the up,
+ * down, left and right arrows, 'd' 'r' 'm' 'u' those letters; any other byte
+ * counts as a plain key press.
+ */
+enum {
+  kSerdatrRxBufferFull = 0x4000U,
+  kIntreqRxBufferFull = 0x0800U,
+  kSerialDataMask = 0x00FFU,
+  kSerialEsc = 0x1BU,
+  kSerialReturn = 0x0DU,
+  kSerialUp = 0x80U,
+  kSerialDown = 0x81U,
+  kSerialLeft = 0x82U,
+  kSerialRight = 0x83U
+};
+
+static unsigned char kbdSerialPoll(unsigned char *byte_out) {
+  const unsigned short serdatr = AMIGA_SERDATR;
+
+  if ((serdatr & kSerdatrRxBufferFull) == 0U) {
+    return 0U;
+  }
+  *byte_out = (unsigned char)(serdatr & kSerialDataMask);
+  AMIGA_INTREQ = kIntreqRxBufferFull;
+  return 1U;
+}
+
+static unsigned char map_serial_to_logical(unsigned char byte) {
+  switch (byte) {
+    case kSerialEsc:
+      return KEY_ESC;
+    case kSerialReturn:
+      return KEY_RETURN;
+    case kSerialUp:
+      return KEY_UP_ARROW;
+    case kSerialDown:
+      return KEY_DOWN_ARROW;
+    case kSerialLeft:
+      return KEY_LEFT_ARROW;
+    case kSerialRight:
+      return KEY_RIGHT_ARROW;
+    case 'd':
+      return KEY_D;
+    case 'r':
+      return KEY_R;
+    case 'm':
+      return KEY_M;
+    case 'u':
+      return KEY_U;
+    default:
+      return kInvalidScancode;
+  }
+}
+#endif
+
 static void kbdDelay(unsigned long loops) {
   while (loops--) {
     __asm__ volatile("nop\n nop\n nop\n nop\n" ::: "memory");
@@ -111,6 +170,15 @@ unsigned char kbd_poll_scancode(void) {
   unsigned char key_down;
   unsigned char logical;
 
+#if defined(_DEBUG) && (_DEBUG > 0)
+  {
+    unsigned char byte;
+    if (kbdSerialPoll(&byte)) {
+      return map_serial_to_logical(byte);
+    }
+  }
+#endif
+
   if (!kbdPollRawEvent(&raw_code, &key_down)) {
     return kInvalidScancode;
   }
@@ -145,6 +213,12 @@ void kbd_wait_for_key_press(void) {
     unsigned char raw_code;
     unsigned char key_down;
 
+#if defined(_DEBUG) && (_DEBUG > 0)
+    if (kbdSerialPoll(&raw_code)) {
+      return;
+    }
+#endif
+
     if (!kbdPollRawEvent(&raw_code, &key_down)) {
       kbdDelay(kPollDelayLoops);
       continue;
@@ -162,6 +236,12 @@ unsigned char kbd_wait_for_key_or_esc(void) {
   for (;;) {
     unsigned char raw_code;
     unsigned char key_down;
+
+#if defined(_DEBUG) && (_DEBUG > 0)
+    if (kbdSerialPoll(&raw_code)) {
+      return (raw_code == kSerialEsc) ? KEY_ESC : 0U;
+    }
+#endif
 
     if (!kbdPollRawEvent(&raw_code, &key_down)) {
       kbdDelay(kPollDelayLoops);

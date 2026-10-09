@@ -8,6 +8,16 @@
 
 #include "../common/platform.h"
 
+#if defined(_DEBUG) && (_DEBUG > 0)
+#include "htrace.h"
+
+/* The trace channel of debug builds: Hatari's NF_STDERR native feature,
+   which Hatari prints on its stderr (EPIC-00 STORY-02). */
+void platform_trace_init(void) { hatari_trace_init(); }
+
+void platform_trace_write(const char *text) { hatari_trace_msg(text); }
+#endif
+
 enum {
   kSeedSamples = 16U,
   kSeedRotateBits = 5U,

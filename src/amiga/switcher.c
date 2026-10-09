@@ -9,10 +9,19 @@
 #include "../common/chooser.h"
 #include "../common/kbd.h"
 #include "../common/palloc.h"
+#include "../common/platform.h"
 #include "../common/rom_check.h"
 #include "../common/text.h"
+#include "../common/trace.h"
 #include "mem.h"
 #include "screen.h"
+
+#ifndef APP_VERSION_STR
+#define APP_VERSION_STR "0.0.0"
+#endif
+#ifndef BUILD_ID_STR
+#define BUILD_ID_STR "unknown"
+#endif
 
 enum {
   kPolledInterruptLevel = 7U,
@@ -23,19 +32,12 @@ enum {
   kCrcResultRow = 1U,
   kCrcDetailsRow = 2U,
   kCrcPromptRow = 4U,
+  kCrcBuildRow = 6U,
   kCrcSpinnerCol = 27U
 };
 
 extern unsigned char _end;
 static unsigned char gCrcSpinnerIndex = 0U;
-
-#if defined(_DEBUG) && (_DEBUG > 0)
-static void screen_trace_msg(const char *message) {
-  if (message != (const char *)0) {
-    text_printf("%s", message);
-  }
-}
-#endif
 
 static void setInterruptLevelMask(unsigned short maskLevel) {
   unsigned short statusRegister;
@@ -84,6 +86,8 @@ static void verify_rom_check_before_menu(void) {
   gCrcSpinnerIndex = 0U;
   text_clear();
   text_set_color(kColorDefault);
+  text_set_cursor(0U, kCrcBuildRow);
+  text_printf("Rescue Switcher v%s, build %s", APP_VERSION_STR, BUILD_ID_STR);
   text_set_cursor(0U, kCrcStatusRow);
   text_printf("Checking ROM checksum...");
 
@@ -93,6 +97,9 @@ static void verify_rom_check_before_menu(void) {
                    AMIGA_ROM_CHECKSUM_FIELD_SIZE_BYTES, show_check_progress,
                    &check_result);
 
+  TRACE("romcheck %s stored=%08lX computed=%08lX",
+        check_result.matches ? "ok" : "fail", check_result.stored_value,
+        check_result.computed_value);
   text_set_cursor(0U, kCrcResultRow);
   text_set_color(check_result.matches ? kColorSuccess : kColorFailure);
   text_printf("ROM checksum %s", check_result.matches ? "OK  " : "FAIL");
@@ -105,6 +112,7 @@ static void verify_rom_check_before_menu(void) {
     text_printf("Computed: %08lX", check_result.computed_value);
     text_set_cursor(0U, kCrcPromptRow);
     text_printf("Press any key to continue...");
+    TRACE("waitkey");
     kbd_wait_for_key_press();
   }
 
@@ -122,6 +130,11 @@ void rom_switcher_main(void) {
 
   setInterruptLevelMask(kPolledInterruptLevel);
 
+#if defined(_DEBUG) && (_DEBUG > 0)
+  platform_trace_init();
+#endif
+  TRACE("rescue v%s %s amiga", APP_VERSION_STR, BUILD_ID_STR);
+
   screen_init();
   text_init();
 
@@ -130,7 +143,7 @@ void rom_switcher_main(void) {
   verify_rom_check_before_menu();
 
 #if defined(_DEBUG) && (_DEBUG > 0)
-  chooser_loop(ROM_BASE_ADDR_UL, screen_trace_msg, kColorDefault,
+  chooser_loop(ROM_BASE_ADDR_UL, platform_trace_write, kColorDefault,
                "Amiga 500/2000");
 #else
   chooser_loop(ROM_BASE_ADDR_UL, (helper_trace_fn_t)0, kColorDefault,

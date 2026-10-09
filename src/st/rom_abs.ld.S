@@ -28,7 +28,7 @@ SECTIONS
     __ram_code_load_start = LOADADDR(.ramtext);
     __ram_code_rom_start = ABSOLUTE(ORIGIN(ROM) + LOADADDR(.ramtext));
     __ram_code_start = .;
-    *(EXCLUDE_FILE(*STARTUP_ROM_OBJ) .text .text.*)
+    *(EXCLUDE_FILE(*STARTUP_ROM_OBJ *test.c.o) .text .text.*)
     *(.rodata .rodata.*)
     __ram_code_end = .;
   } > RAM
@@ -62,7 +62,17 @@ SECTIONS
   _end = .;
   __end = .;
 
-  __rom_lma_end = LOADADDR(.data) + SIZEOF(.data);
+  .romdata (ORIGIN(ROM) + LOADADDR(.data) + SIZEOF(.data)) :
+      AT(LOADADDR(.data) + SIZEOF(.data))
+  {
+    /* Read-only data that stays in ROM: the fake flash of test builds,
+       which a.out puts in test.c.o's .text. Empty in release builds. */
+    __romdata_start = .;
+    *test.c.o(.text .text.* .rodata .rodata.*)
+    __romdata_end = .;
+  } > ROM
+
+  __rom_lma_end = LOADADDR(.romdata) + SIZEOF(.romdata);
 
   /DISCARD/ :
   {

@@ -13,6 +13,9 @@
 #define AMIGA_REG16(offset) \
   (*(volatile unsigned short *)(unsigned long)(AMIGA_CUSTOM_BASE_ADDR_UL + (offset)))
 
+#define AMIGA_SERDATR AMIGA_REG16(0x018U)
+#define AMIGA_SERDAT AMIGA_REG16(0x030U)
+#define AMIGA_SERPER AMIGA_REG16(0x032U)
 #define AMIGA_COP1LCH AMIGA_REG16(0x080U)
 #define AMIGA_COP1LCL AMIGA_REG16(0x082U)
 #define AMIGA_DMACON AMIGA_REG16(0x096U)

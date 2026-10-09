@@ -448,9 +448,25 @@ void text_build_title_line(char out[SCR_WIDTH_CHARS + 1],
   }
 }
 
+/* Where the formatter writes: the screen by default, or the caller's buffer
+   while text_vsnprintf() runs (the debug trace, EPIC-00 STORY-02). */
+static void (*gTextEmit)(char character) = text_putc;
+
+#if defined(_DEBUG) && (_DEBUG > 0)
+static char *gTextOut;
+static unsigned long gTextOutLeft;
+
+static void textEmitToBuffer(char character) {
+  if (gTextOutLeft > 1UL) {
+    *gTextOut++ = character;
+    gTextOutLeft--;
+  }
+}
+#endif
+
 static void textEmitRepeat(char character, unsigned long count, int *written) {
   while (count--) {
-    text_putc(character);
+    gTextEmit(character);
     (*written)++;
   }
 }
@@ -465,7 +481,7 @@ static unsigned long textStrlenLocal(const char *text) {
 
 static void textEmitSpan(const char *text, unsigned long len, int *written) {
   for (unsigned long i = 0; i < len; ++i) {
-    text_putc(text[i]);
+    gTextEmit(text[i]);
   }
   *written += (int)len;
 }
@@ -597,22 +613,19 @@ static void textReportCheck(const char *label, unsigned short checkFailures,
   text_set_color(1U);
 }
 
-int text_printf(const char *fmt, ...) {
-  va_list argList;
+static int textFormat(const char *fmt, va_list argList) {
   int written = 0;
-
-  va_start(argList, fmt);
 
   while (*fmt) {
     if (*fmt != '%') {
-      text_putc(*fmt++);
+      gTextEmit(*fmt++);
       written++;
       continue;
     }
 
     fmt++; /* skip '%' */
     if (*fmt == '%') {
-      text_putc('%');
+      gTextEmit('%');
       written++;
       fmt++;
       continue;
@@ -686,7 +699,7 @@ int text_printf(const char *fmt, ...) {
         if (!leftAlign) {
           textEmitRepeat(' ', pad, &written);
         }
-        text_putc(outputChar);
+        gTextEmit(outputChar);
         written++;
         if (leftAlign) {
           textEmitRepeat(' ', pad, &written);
@@ -774,18 +787,45 @@ int text_printf(const char *fmt, ...) {
       }
 
       /* Unknown specifier: print it literally to aid debugging. */
-      text_putc('%');
+      gTextEmit('%');
       written++;
       if (spec) {
-        text_putc(spec);
+        gTextEmit(spec);
         written++;
       }
     }
   }
 
+  return written;
+}
+
+int text_printf(const char *fmt, ...) {
+  va_list argList;
+  int written;
+
+  va_start(argList, fmt);
+  written = textFormat(fmt, argList);
   va_end(argList);
   return written;
 }
+
+#if defined(_DEBUG) && (_DEBUG > 0)
+int text_vsnprintf(char *out, unsigned long size, const char *fmt,
+                   va_list args) {
+  int written;
+
+  if (out == (char *)0 || size == 0UL) {
+    return 0;
+  }
+  gTextOut = out;
+  gTextOutLeft = size;
+  gTextEmit = textEmitToBuffer;
+  written = textFormat(fmt, args);
+  gTextEmit = text_putc;
+  *gTextOut = '\0';
+  return written;
+}
+#endif
 
 unsigned short text_run_feature_tests(void) {
   unsigned short failures = 0U;
