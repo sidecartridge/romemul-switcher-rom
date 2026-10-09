@@ -160,6 +160,18 @@ class Trace:
             else:
                 time.sleep(0.02)
 
+    def drain(self, seconds):
+        """Read whatever arrives for this long, matching nothing."""
+        end = time.time() + seconds
+        while True:
+            more = self._read_more()
+            if more:
+                self.data += more
+            elif time.time() >= end:
+                return
+            else:
+                time.sleep(0.02)
+
     def lines(self):
         return [line for line in self.data.decode("latin-1").splitlines()
                 if line.startswith("@@")]
@@ -251,9 +263,14 @@ def run_session(trace, press, shot, steps, platform, corrupt, screen=None):
     need("boot after reset", rf"@@ rescue v{ver} \S+ {platform}\n", 90)
 
 
-def finish(label, run_dir, steps, error, trace):
+def finish(label, run_dir, steps, error, trace, interactive=False):
     with open(os.path.join(run_dir, "trace.txt"), "w", encoding="latin-1") as handle:
         handle.write("\n".join(trace.lines()) + "\n")
+    if interactive:
+        # Nothing was checked: say so rather than PASS.
+        print(f"ENDED {label}: interactive run, {len(trace.lines())} trace lines "
+              f"({run_dir})")
+        return 0
     if error is None:
         print(f"PASS {label}: {steps.done} steps, {steps.retries} key retries, "
               f"{steps.elapsed():.0f} s ({run_dir})")

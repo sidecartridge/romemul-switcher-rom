@@ -44,6 +44,10 @@ def fsuae_config(image, serial, run_dir, args):
         "fast_memory = 0",
         f"serial_port = {serial}",
         f"logs_dir = {run_dir}",
+        # With no joystick connected, FS-UAE makes the keyboard a joystick in
+        # port 1: the cursor keys and right Alt/Ctrl never reach the Amiga
+        # keyboard. The chooser needs the arrows (EPIC-01).
+        "joystick_port_1 = none",
         "audio_driver = dummy",
         "sound_output = none",
         "volume = 0",
@@ -99,10 +103,18 @@ def main():
     print(f"{label}: {os.path.relpath(image, hc.REPO)}", flush=True)
 
     if args.interactive:
-        print("FS-UAE is open; close it to end the run.", flush=True)
-        while proc.poll() is None:
-            trace.wait_for(r"$^", 0.5)
-        return hc.finish(label, run_dir, steps, None, trace)
+        print("FS-UAE is open; close it (or press Ctrl-C here) to end the run.", flush=True)
+        try:
+            while proc.poll() is None:
+                trace.drain(0.5)
+        except KeyboardInterrupt:
+            proc.send_signal(signal.SIGTERM)
+            try:
+                proc.wait(10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        trace.drain(0.5)
+        return hc.finish(label, run_dir, steps, None, trace, interactive=True)
 
     def shot(name):
         return None  # FS-UAE takes no screenshot from outside (see STORY-04)
@@ -127,7 +139,7 @@ def main():
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait(5)
-        trace.wait_for(r"$^", 0)
+        trace.drain(0.5)
         os.close(master)
         os.close(slave)
     if proc.poll() is None:

@@ -106,10 +106,17 @@ def main():
     print(f"{label}: {os.path.relpath(image, hc.REPO)}", flush=True)
 
     if args.interactive:
-        print("Hatari is open; close it to end the run.", flush=True)
-        proc.wait()
-        trace.wait_for(r"$^", 0)  # read what is left
-        return hc.finish(label, run_dir, steps, None, trace)
+        print("Hatari is open; close it (or press Ctrl-C here) to end the run.", flush=True)
+        try:
+            proc.wait()
+        except KeyboardInterrupt:
+            proc.send_signal(signal.SIGTERM)  # --confirm-quit false: no dialog
+            try:
+                proc.wait(10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        trace.drain(0.5)  # read what is left
+        return hc.finish(label, run_dir, steps, None, trace, interactive=True)
 
     error = None
     conn = None
@@ -166,7 +173,7 @@ def main():
         except subprocess.TimeoutExpired:
             proc.send_signal(signal.SIGKILL)
             proc.wait(5)
-        trace.wait_for(r"$^", 0)
+        trace.drain(0.5)
         shutil.rmtree(sock_dir, ignore_errors=True)
     if proc.poll() is None:
         error = (error or "") + "; Hatari still running"
