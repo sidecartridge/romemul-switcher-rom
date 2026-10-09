@@ -44,26 +44,19 @@ verification story that is Diego's checkpoint.
 | # | Epic | Why at this point |
 | --- | --- | --- |
 | EPIC-00 | A test harness on Hatari and FS-UAE that boots the ROM images | Asked by Diego, 2026-10-09, after sidecartos-config's EPIC-00 showed how much a host-driven emulator loop saves. First, as in both siblings: with it, every fix below is exercised on all three images in minutes before it reaches the bench. It also repairs the two things the loop needs and that are broken today: debug builds that link, and a `build.sh` that keeps debug output out of `dist/`. Done 2026-10-09: nine sessions in about a minute (`tools/dev/all_harness.sh`). |
-| EPIC-01 | The three images by eye, before the release | Diego, 2026-10-09: the `--interactive` looks, taken out of EPIC-00, come before the release gate. The harnesses check the trace, not the picture, and type on the Amiga through the serial port; only this sees every screen and the Amiga's CIA keyboard path. |
+| EPIC-01 | The three images by eye, before the release | Diego, 2026-10-09: the `--interactive` looks, taken out of EPIC-00, come before the release gate. The harnesses check the trace, not the picture, and type on the Amiga through the serial port; only this sees every screen and the Amiga's CIA keyboard path. Done 2026-10-09: every screen agreed by Diego. |
+| EPIC-03 | A self-test of the device, from the rescue ROM | Asked by Diego, 2026-10-09: address and data lines, ping and command reliability, flash reads, catalog and configuration, machine information, run from the chooser, plus the nonce fix and a ping at boot. Runs before EPIC-02, which keeps its number because the firmware session already cites it. It changes the images, so it comes before the release gate and the firmware's final pins. |
 | EPIC-02 | The v4.0.0 release gate | Last: the release notes, the first CI runs of EPIC-00's build path, the merges and the `v4.0.0` tag (Diego's step), and the firmware's re-pin from the published images (C-06). |
 
-Any candidate below that Diego chooses for v4.0.0 becomes an epic that runs before EPIC-01 and
-EPIC-02; since neither has started, they are renumbered then rather than leaving the numbers
-out of execution order.
+The table is the execution order; EPIC-03 runs before EPIC-02. A candidate below that Diego
+chooses for v4.0.0 becomes an epic, or a story of EPIC-03, that runs before EPIC-02.
 
 ### Candidates, not yet epics
 
 Found on 2026-10-09 in the review of the ST video path, the sync with the two sibling sessions,
 and EPIC-00. None is approved yet; each waits for Diego to choose it into an epic.
 
-- **The nonce never changes during a run.** In ROM mode the ST seed samples MFP timer C and D,
-  but `startup_st.s`/`startup_ste.s` execute `reset`, which stops the MFP timers, and nothing
-  restarts them; the Amiga seed is the long at address 4, a fixed RAM value. So every frame of a
-  run carries the same nonce. The lock after each `UNLOCK_READ_BLOCK` restores base+0 and hides
-  most of it, but a retry after a checksum mismatch, or a read after a failed restore, can take a
-  stale echo, and with it the previous block's data, which carries a valid checksum of its own.
-  The firmware never checks the nonce, so the fix is ours alone. The host SWITCHER has the same
-  bug (sidecartos-config EPIC-03).
+- **The nonce never changes during a run.** Now EPIC-03 STORY-01 (Diego, 2026-10-09).
 - **The Amiga reset races the firmware's reboot** (C-07). `_platform_hard_reset` resets and
   jumps to ROM offset 2 microseconds after `SELECT_ROM`, so the Amiga re-enters this switcher
   from the old image and meets the undriven bus partway through its boot. The ST waits about
@@ -88,8 +81,20 @@ and EPIC-00. None is approved yet; each waits for Diego to choose it into an epi
   the illegal opcode 0x7300, which Hatari intercepts; on a real ST in ROM mode it traps through
   an exception vector nothing has set. Debug images are for Hatari only, or the debug build
   installs a vector that answers "no native features".
+- **The build line collides with the loading line** (found 2026-10-09 in the release images of
+  `0d827d3`, made for a firmware test image). EPIC-00 put "Rescue Switcher v4.0.0, build <id>"
+  on row 6 of the checksum screen, where `chooser_loop()` then prints "Loading available ROM
+  images..." without clearing the line: the release screen reads "Loading available ROM
+  images...d827d3" while the catalog loads, and stays so on a read error. Fix: leave the
+  cursor below the build line after the checksum screen (both `switcher.c`). Changes all three
+  release images, so the firmware re-pins after it. Before EPIC-02.
 - **Hardware verification of v4.0.0**: the three images on the RP2350A and the RP2350B, each
   booted in Rescue Mode, listing, selecting and booting a ROM. No epic yet; if chosen, it runs
-  before EPIC-02. The release notes and the release gate itself are EPIC-02.
+  before EPIC-02. The release notes and the release gate itself are EPIC-02. First evidence,
+  reported by the firmware session on 2026-10-09: the `0d827d3` images, pinned in firmware
+  `16b66e1` for its test release images, ran on both boards on the Atari ST and the Amiga
+  (Diego: "works great"), the rescue ROM booted both from the RESCUE input and through
+  `RESCUE_TIMEOUT`. Not yet known from that report: whether a ROM was selected and booted on the
+  Amiga, which is where the reset race of C-07 would show.
 
 **Outcome:** _pending._
