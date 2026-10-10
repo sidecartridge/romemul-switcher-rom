@@ -27,3 +27,9 @@ The firmware session confirms the new pins, or Diego does.
 The 2026-09-09 pins in the firmware's `MANIFEST.txt` match our local `dist/` of that day; the
 firmware session was told on 2026-10-09 that they will not match the release and that the
 Amiga one shows "v3.1.0".
+
+2026-10-10: the firmware session (`sidecartos-ce`) told that the v4.0.0 release images are
+coming and will not match its pins: what EPIC-03 changed (no contract change; `CMD_PING` and
+`CMD_RESTORE_PREVIOUS_ROM` as told on 2026-10-09), that the hashes depend on `main`'s commit, that
+CI and local builds of a commit are byte-identical, and that the three assets' SHA-256 follow
+the publication.
