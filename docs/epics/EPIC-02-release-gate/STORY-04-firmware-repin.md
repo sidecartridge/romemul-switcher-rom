@@ -2,7 +2,7 @@
 id: STORY-04
 epic: EPIC-02
 title: The firmware re-pins (sync)
-status: in-progress
+status: done
 ---
 
 ## Goal
@@ -14,9 +14,9 @@ SHA-256 (C-06, D-03).
 
 - [x] The SHA-256 of the three release assets sent to the firmware session (or, if none is
       running, to Diego with the file to change: `../sidecartos/DEFAULT_ROM/MANIFEST.txt`)
-- [ ] The firmware re-pins and its `tools/image/make_images.py --download` fetches the three
+- [x] The firmware re-pins and its `tools/image/make_images.py --download` fetches the three
       files from the release; its note that the pins come from an uncommitted tree goes away
-- [ ] The Amiga pin of 2026-09-09, whose image shows "v3.1.0" in its title, is gone
+- [x] The Amiga pin of 2026-09-09, whose image shows "v3.1.0" in its title, is gone
 
 ## Acceptance
 
@@ -42,3 +42,19 @@ built with them, 50 checks passed and 0 failed. The re-pin itself waits for Dieg
 firmware repo, where he asked to hold it: `DEFAULT_ROM/MANIFEST.txt` with the three hashes, its
 note about the `0d827d3` test images replaced, probably with the host SWITCHER's re-pin
 (sidecartos-config `eb1dd0c`). The firmware session sends its commit when that lands.
+
+2026-10-10, the re-pin: firmware commit `454abda` on its `RP2350B` branch, committed locally there
+and not pushed yet; it reaches the firmware's `main` when Diego merges `RP2350B`. Checked here
+in `../sidecartos` (read-only): `DEFAULT_ROM/MANIFEST.txt` at `454abda` pins the three assets'
+SHA-256 at their v4.0.0 release URLs, its note names our v4.0.0 release tagged on `main` at
+`561b13d` and its reproducible builds, and no earlier rescue pin is left (the `0d827d3` ones,
+and with them the 2026-09-09 Amiga one). The firmware session reports `make_images.py
+--download` fetching the three files from the release into an emptied `DEFAULT_ROM/` and
+checking them against the pins, and both boards' release images passing its 50 harness checks.
+
+Also from the firmware session (its `4339cc6`): firmware EPIC-03 moved to its iteration 2
+(Diego, 2026-10-10), D-20's refusal of a large ROM whose slot is not staged included; that
+refusal boots the rescue ROM instead. Firmware v4.0.0 ships the slot faults as a known issue,
+seen only with `LARGE_ROMS = 1`, off by default.
+
+**Done 2026-10-10.**

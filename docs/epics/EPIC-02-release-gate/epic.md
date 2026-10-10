@@ -2,7 +2,7 @@
 id: EPIC-02
 iteration: 1
 title: The v4.0.0 release gate
-status: in-progress
+status: done
 ---
 
 ## Goal
@@ -45,3 +45,6 @@ images, checked and pinned by hash in STORY-03. The release page's text was clea
 publication (one line per paragraph, no `# Changelog` title), and so were `CHANGELOG.md` and
 `release.yml`. Only `main` is left as a branch, locally and on GitHub (Diego). Open: the
 firmware's re-pin (STORY-04), waiting for Diego's go in the firmware repo.
+
+**Closing, 2026-10-10.** The firmware re-pinned the three release images in its `454abda`
+(STORY-04), which reaches its `main` when Diego merges its `RP2350B` branch. Iteration 1 is done.
