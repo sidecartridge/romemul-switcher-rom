@@ -87,7 +87,8 @@ static void verify_rom_check_before_menu(void) {
   text_clear();
   text_set_color(kColorDefault);
   text_set_cursor(0U, kCrcBuildRow);
-  text_printf("Rescue Switcher v%s, build %s", APP_VERSION_STR, BUILD_ID_STR);
+  text_printf("Rescue Switcher v%s, %lu KB image, build %s", APP_VERSION_STR,
+              (unsigned long)AMIGA_ROM_SIZE_BYTES >> 10, BUILD_ID_STR);
   text_set_cursor(0U, kCrcStatusRow);
   text_printf("Checking ROM checksum...");
 
@@ -117,7 +118,9 @@ static void verify_rom_check_before_menu(void) {
   }
 
   text_set_color(kColorDefault);
-  text_set_cursor(0U, (unsigned short)(kCrcPromptRow + 2U));
+  /* Below the build line: the chooser goes on printing from here, and on the
+     build line's own row it left "Loading available ROM images...<id>". */
+  text_set_cursor(0U, (unsigned short)(kCrcBuildRow + 2U));
 }
 
 void rom_switcher_main(void) {

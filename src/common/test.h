@@ -14,8 +14,10 @@
 
 enum {
   kFlashParamsRawSize = 4096U,
-  kFlashCatalogRawSize = 61440U,
-  kFlashStorageRawSize = 65536U
+  /* The 33 records the test catalog holds, then the zero record that ends
+     the chooser's walk: the test image must stay under 64 KB for the
+     address-line layout (EPIC-03 STORY-03). */
+  kFlashCatalogRawSize = 8704U
 };
 
 /* The fake flash is read-only and stays in ROM: as RAM data it would not
@@ -24,7 +26,6 @@ enum {
    which both linker scripts place in ROM by file name (.romdata). */
 extern const unsigned char flashParamsRaw[kFlashParamsRawSize];
 extern const unsigned char flashCatalogRaw[kFlashCatalogRawSize];
-extern const unsigned char flashStorageRaw[kFlashStorageRawSize];
 
 #endif /* _DEBUG || _TEST || TEST */
 

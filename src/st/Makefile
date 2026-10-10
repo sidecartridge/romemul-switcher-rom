@@ -64,12 +64,12 @@ ASFLAGS := $(ASFLAGS_BASE) -DROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL)
 LDFLAGS := $(NO_EXT_LIB_FLAGS) -Wl,--traditional-format,-Map=$(TARGET_MAP),--entry,_start
 LDFLAGS_ROM := $(NO_EXT_LIB_FLAGS) -Wl,-Map=$(TARGET_ROM_MAP),--entry,_os_entry,-T,$(ROM_LDSCRIPT),--oformat,binary
 
-SRCS_C := switcher.c text.c screen.c kbd.c glyph.c platform.c htrace.c palloc.c commands.c chooser.c rom_check.c trace.c
+SRCS_C := switcher.c text.c screen.c kbd.c glyph.c platform.c htrace.c palloc.c commands.c chooser.c rom_check.c trace.c nonce.c selftest.c
 ifeq ($(TEST),1)
 SRCS_C += test.c
 endif
-SRCS_S_PRG := start.s natfeat.s
-SRCS_S_ROM := $(STARTUP_ROM_ASM) natfeat.s
+SRCS_S_PRG := start.s natfeat.s probe.s
+SRCS_S_ROM := $(STARTUP_ROM_ASM) natfeat.s probe.s
 VPATH := . ../common
 
 # start.s must be linked first so PRG execution begins at _start.

@@ -4,8 +4,9 @@ File: scripts/finalize_rom.py
 Author: Diego Parrilla Santamaría
 Date: 2026-10-09
 Copyright: 2024-26 - GOODDATA LABS SL
-Description: Turn a linked ROM image into the published one: exact size,
-random fill in the unused space, and the 32-bit big-endian additive checksum
+Description: Turn a linked ROM image into the published one: exact size, a
+computed pattern in the unused space, the self-test's words, and the 32-bit
+big-endian additive checksum
 the ROM verifies at boot. On the Amiga also the Kickstart checksum, written
 and checked with romtool.
 
@@ -48,9 +49,36 @@ def fail(message):
     sys.exit(f"Error: {message}")
 
 
-def fill_random(image, offset, length):
-    if length > 0:
-        image[offset:offset + length] = os.urandom(length)
+# The stress region of the self-test (EPIC-03 STORY-11): from here to 4 KB below
+# the end of the image, every word is fill_word(offset) unless it is a self-test
+# word. The payload must end before it.
+STRESS_START = 0x10000
+STRESS_TOP_GAP = 0x1000
+
+
+def fill_word(offset):
+    """The word the build writes at an even offset of the unused space, mixed
+    from the offset so the ROM can check a read anywhere there. Shifts and
+    additions, no multiply (the ROM has no libgcc), and not linear: with a
+    xorshift the word one address line away always differed by the same bits,
+    so a stuck address line could pass for a data line. Mirrored in
+    src/common/selftest.c, selftestFillWord()."""
+    m = 0xFFFFFFFF
+    x = (offset ^ 0x9E3779B9) & m
+    x = (x + (x << 10)) & m
+    x ^= x >> 6
+    x = (x + (x << 3)) & m
+    x ^= x >> 11
+    x = (x + (x << 15)) & m
+    return (x ^ (x >> 16)) & 0xFFFF
+
+
+def fill_pattern(image, offset, length):
+    """The unused space, as computed words (EPIC-03 STORY-11): no longer random,
+    so a clean build of a commit gives the same bytes anywhere."""
+    for o in range(offset, offset + length):
+        word = fill_word(o & ~1)
+        image[o] = (word >> 8) if (o & 1) == 0 else (word & 0xFF)
 
 
 def map_symbol(map_path, symbol):
@@ -75,6 +103,68 @@ def sum_be16(buf):
     if idx < length:
         total = (total + (buf[idx] << 8)) & 0xFFFFFFFF
     return total
+
+
+def address_line_count(size):
+    """The address lines the image spans: A1 to A17 for 192 and 256 KB, A1 to A18
+    for 512 KB (the 68000 has no A0)."""
+    return (size - 1).bit_length() - 1
+
+
+def address_layout(size):
+    """The address-line test (EPIC-03 STORY-03): for each line An, a reference
+    word and a partner word whose offsets differ only in that line, each with
+    its signature, as (n, ref, ref_signature, partner, partner_signature).
+    Mirrored in src/common/selftest.c, selftestAddressLayout()."""
+    layout = []
+    for n in range(1, address_line_count(size) + 1):
+        ref, ref_sig = size - 0x100, 0x5AA5
+        partner = ref ^ (1 << n)
+        if partner >= size:
+            # Only the ST's 192 KB window, line A16: a second reference low in
+            # the image, clear of the first one's partners.
+            ref, ref_sig = (size - 0x200) & 0xFFFF, 0x5A5A
+            partner = ref ^ (1 << n)
+        layout.append((n, ref, ref_sig, partner, 0xA500 | n))
+    return layout
+
+
+def data_patterns(size):
+    """The data-line test (EPIC-03 STORY-04): a 64-byte block 4 KB from the end
+    of the image holding the 16 walking-one words, then the 16 walking-zero
+    words, as (offset, word). Mirrored in src/common/selftest.c."""
+    block = size - 0x1000
+    ones = [(block + 2 * k, 1 << k) for k in range(16)]
+    zeros = [(block + 32 + 2 * k, 0xFFFF ^ (1 << k)) for k in range(16)]
+    return ones + zeros
+
+
+def write_selftest_patterns(image, p, payload_end):
+    """Writes the self-test's words (address signatures, data patterns), refusing
+    any offset in the payload, a checksum field, the Amiga's kickety split, or
+    claimed twice."""
+    size = p["size"]
+    if payload_end > STRESS_START:
+        fail(f"the payload ends at {payload_end:#x}, inside the self-test's stress region "
+             f"(from {STRESS_START:#x})")
+    forbidden = [(p["check"], size)]
+    if "kickety" in p:
+        forbidden.append((p["kickety"], p["kickety"] + p["kickety_size"]))
+    words = []
+    for n, ref, ref_sig, partner, partner_sig in address_layout(size):
+        words += [(f"A{n}", ref, ref_sig), (f"A{n}", partner, partner_sig)]
+    words += [("data", offset, word) for offset, word in data_patterns(size)]
+    claimed = {}
+    for what, offset, word in words:
+        if offset < payload_end:
+            fail(f"self-test word of {what} at {offset:#x} is inside the payload "
+                 f"(ends at {payload_end:#x})")
+        if any(lo <= offset + 1 and offset < hi for lo, hi in forbidden):
+            fail(f"self-test word of {what} at {offset:#x} hits a reserved field")
+        if claimed.get(offset, word) != word:
+            fail(f"offset {offset:#x} claimed by two self-test words")
+        claimed[offset] = word
+        image[offset:offset + 2] = struct.pack(">H", word)
 
 
 def write_check_field(image, p):
@@ -109,7 +199,9 @@ def finalize_st(platform, raw, out):
     if len(raw) > p["check"]:
         fail(f"{platform} payload ({len(raw)} bytes) overlaps the checksum field")
     image = bytearray(raw)
-    image.extend(os.urandom(p["size"] - len(image)))
+    image.extend(bytes(p["size"] - len(image)))
+    fill_pattern(image, len(raw), p["size"] - len(raw))
+    write_selftest_patterns(image, p, len(raw))
     checksum = write_check_field(image, p)
     with open(out, "wb") as handle:
         handle.write(image)
@@ -129,8 +221,9 @@ def finalize_amiga(raw, map_path, out, cmd):
         fail("Amiga payload overlaps the kickety split area")
 
     image = bytearray(raw)
-    fill_random(image, payload_end, p["kickety"] - payload_end)
-    fill_random(image, kickety_end, p["check"] - kickety_end)
+    fill_pattern(image, payload_end, p["kickety"] - payload_end)
+    fill_pattern(image, kickety_end, p["check"] - kickety_end)
+    write_selftest_patterns(image, p, payload_end)
     image[p["check"]:p["check"] + 4] = b"\x00\x00\x00\x00"
     with open(out, "wb") as handle:
         handle.write(image)

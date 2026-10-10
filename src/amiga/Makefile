@@ -56,7 +56,7 @@ CFLAGS := -m68000 -std=gnu99 -ffreestanding -fomit-frame-pointer $(OPT_FLAGS) -W
 ASFLAGS := -m68000 -x assembler-with-cpp $(NO_EXT_LIB_FLAGS) $(DEBUG_DEFS) $(TEST_DEFS) -DROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL) -MMD -MP
 LDFLAGS_ROM := $(NO_EXT_LIB_FLAGS) -Wl,-Map=$(TARGET_MAP),-T,$(ROM_LDSCRIPT),--oformat,binary
 
-SRCS_C := switcher.c text.c screen.c kbd.c glyph.c platform.c palloc.c commands.c chooser.c rom_check.c trace.c
+SRCS_C := switcher.c text.c screen.c kbd.c glyph.c platform.c palloc.c commands.c chooser.c rom_check.c trace.c nonce.c selftest.c
 ifeq ($(TEST),1)
 SRCS_C += test.c
 endif

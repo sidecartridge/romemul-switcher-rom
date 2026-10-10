@@ -8,6 +8,8 @@
 
 .globl _start
 .extern _rom_switcher_main
+.extern _st_ram_bytes
+.extern _st_ram_mmu
 
 #include "mem.h"
 
@@ -31,6 +33,11 @@ _start:
     bmi.s   halt
 
 have_supervisor:
+    /* The RAM for the self-test (EPIC-03 STORY-13): TOS already sized it,
+       and probing would wreck it. Its phystop and memctrl variables. */
+    move.l  0x42e, _st_ram_bytes
+    move.b  0x424, _st_ram_mmu
+
     move.l  #ST_STACK_TOP_ADDR_UL, %sp
     jsr     _rom_switcher_main
 

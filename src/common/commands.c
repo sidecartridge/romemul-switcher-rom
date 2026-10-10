@@ -20,7 +20,11 @@ enum {
   kChecksumOffset = kReadRomBlockSize,
   kCmdSelectRom = 0x0000,
   kCmdUnlockReadBlockMemory = 0x0008,
-  kCmdLockReadBlockMemory = 0x000A
+  kCmdLockReadBlockMemory = 0x000A,
+  kCmdRestorePreviousRom = 0x000E,
+  kCmdPing = 0x0012,
+  kPingTimeout = 0x4000,
+  kRestorePolls = 0xFFFF
 };
 
 static inline unsigned short be_to_le_word(unsigned short x) {
@@ -30,6 +34,9 @@ static inline unsigned short be_to_le_word(unsigned short x) {
 static unsigned long remote_rom_address = 0;
 static unsigned long scratch_rom_address = 0;
 static unsigned long magic_number_address = 0;
+/* The image's own first long, read before any command (EPIC-03 STORY-05). */
+static unsigned long rom_first_long = 0;
+static unsigned long block_retries = 0;
 static helper_trace_fn_t g_trace_fn = (helper_trace_fn_t)0;
 
 static unsigned short div_u32_u16(unsigned long n, unsigned short d) {
@@ -107,6 +114,7 @@ void init_rom_address(unsigned long rom_base_address,
       *((volatile unsigned long *)(rom_base_address));
 
   g_trace_fn = trace_fn;
+  rom_first_long = previous_magic_number_value;
   unsigned long addr = (unsigned long)rom_base_address;
   magic_number_address = addr;
   scratch_rom_address = addr;
@@ -205,6 +213,42 @@ static int send_sync_rom_command(unsigned short param, unsigned short command,
   return -1;  // Timeout
 }
 
+/* CMD_RESTORE_PREVIOUS_ROM copies the image's first bytes back from flash
+   over what a command left at base+0; wait until the image's own first long
+   reads there again. */
+static int restore_first_long(void) {
+  volatile unsigned long *magic_number_ptr =
+      (volatile unsigned long *)(magic_number_address);
+  unsigned short tries = kMaxCommandRetries;
+
+  while (tries-- > 0) {
+    unsigned short polls = kRestorePolls;
+    if (*magic_number_ptr == rom_first_long) {
+      return 0;
+    }
+    send_async_rom_command(0, kCmdRestorePreviousRom);
+    while (polls-- > 0) {
+      platform_poll();
+      if (*magic_number_ptr == rom_first_long) {
+        return 0;
+      }
+    }
+  }
+  return -1;
+}
+
+int command_ping(void) {
+  /* The firmware answers by writing the nonce at base+0 (cmd_ping()) and
+     restores nothing, so put the image's word back whatever the answer. */
+  const int answer = send_sync_rom_command(0, kCmdPing, kPingTimeout);
+  const int restored = restore_first_long();
+
+  if (answer != 0) {
+    return answer;
+  }
+  return (restored == 0) ? 0 : -3;
+}
+
 void send_change_rom_command_and_hard_reset(unsigned char rom_index) {
   send_magic_sequence_asm(scratch_rom_address, kCmdSelectRom,
                           hamming_encode(rom_index) << 1);
@@ -237,6 +281,7 @@ static int read_flash_block(void *memory_exchange,
     error = send_sync_rom_command(flash_block_number, kCmdUnlockReadBlockMemory,
                                   0x4000);
     if (error != 0) {
+      block_retries++;
       trace_msg(
           "[romswdbg] helper: unlock read block failed in read_flash_block\n");
     } else if (num_tries > 0) {
@@ -259,6 +304,7 @@ static int read_flash_block(void *memory_exchange,
       // Read the checksum only once per iteration
       remote_checksum = *remote_checksum_ptr;
       if (checksum != remote_checksum) {
+        block_retries++;
         trace_msg("[romswdbg] helper: checksum mismatch in read_flash_block\n");
       } else {
         // Exit the loop if the checksum matches
@@ -300,6 +346,8 @@ static int read_flash_block(void *memory_exchange,
   }
   return error;
 }
+
+unsigned long command_block_retries(void) { return block_retries; }
 
 int read_flash_page(void *memory_exchange, unsigned long flash_address_offset,
                     unsigned char endian) {

@@ -24,6 +24,8 @@ enum {
   kRawRight = 0x4EU,
   kRawLeft = 0x4FU,
   kRawR = 0x13U,
+  kRawT = 0x14U,
+  kRawS = 0x21U,
   kRawU = 0x16U,
   kRawD = 0x22U,
   kRawM = 0x37U,
@@ -37,7 +39,7 @@ static unsigned char kbdInitialized = 0U;
  * Debug builds also take keys from Paula's serial port, which is how the
  * FS-UAE harness types: FS-UAE has no other way to inject keys (EPIC-00
  * STORY-02). One byte per key: 0x1B ESC, 0x0D RETURN, 0x80 to 0x83 the up,
- * down, left and right arrows, 'd' 'r' 'm' 'u' those letters; any other byte
+ * down, left and right arrows, 'd' 'r' 'm' 'u' 't' 's' those letters; any other byte
  * counts as a plain key press.
  */
 enum {
@@ -85,6 +87,10 @@ static unsigned char map_serial_to_logical(unsigned char byte) {
       return KEY_M;
     case 'u':
       return KEY_U;
+    case 't':
+      return KEY_T;
+    case 's':
+      return KEY_S;
     default:
       return kInvalidScancode;
   }
@@ -160,6 +166,10 @@ static unsigned char map_raw_to_logical(unsigned char raw_code) {
       return KEY_U;
     case kRawR:
       return KEY_R;
+    case kRawT:
+      return KEY_T;
+    case kRawS:
+      return KEY_S;
     default:
       return kInvalidScancode;
   }
