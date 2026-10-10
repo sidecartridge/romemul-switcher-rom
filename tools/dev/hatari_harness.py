@@ -9,7 +9,7 @@ chooser with keys through Hatari's control socket, read the trace (NF_STDERR on
 Hatari's stderr), and print PASS or FAIL (EPIC-00 STORY-03).
 
 Usage: hatari_harness.py [--image st|ste] [--machine st|megast|ste|megaste]
-                         [--monitor rgb|mono] [--corrupt] [--interactive]
+                         [--monitor rgb|mono] [--memsize KB] [--corrupt] [--interactive]
 
 Build the image first: tools/dev/build.sh <st|ste> debug-test. Each run gets a
 folder under tools/dev/logs/ with the trace, Hatari's log and the screenshots.
@@ -30,18 +30,24 @@ import harness_common as hc  # noqa: E402
 
 # ST scancodes (src/common/kbd.h); "any" is the space bar.
 SCANCODES = {"up": "0x48", "down": "0x50", "left": "0x4b", "right": "0x4d",
-             "return": "0x1c", "esc": "0x01", "any": "0x39"}
+             "return": "0x1c", "esc": "0x01", "any": "0x39", "t": "0x14", "s": "0x1f"}
 KEY_TIMEOUT = 4.0
 # After a key's release, time for the ROM to read the break code before the next
 # press: its ACIA poll is about 28 ms apart in a debug build, and a press while
 # the release is unread overruns the ACIA and is lost (EPIC-00 STORY-02). 0.2 s
 # of host time is seconds of emulated time under fast-forward.
 RELEASE_PAUSE = 0.2
+# ST RAM sizes Hatari takes, in KB, and the banks it fills: bank 0, bank 1
+# (Hatari's stMemory.c, STMemory_RAM_SetBankSize). 2560 needs the ST's Ricoh
+# MMU: Hatari gives the Mega ST, STE and Mega STE chipsets that use bank 0's
+# setting for both banks.
+BANKS = {512: (512, 0), 1024: (512, 512), 2048: (2048, 0), 2560: (2048, 512),
+         4096: (2048, 2048)}
 
 
 def hatari_args(image, args, run_dir, sock_path):
     cmd = [hc.emulator_path("hatari"), "--tos", image, "--machine", args.machine,
-           "--memsize", "0", "--ttram", "0",  # 512 KB (D-07)
+           "--memsize", str(args.memsize), "--ttram", "0",  # 512 KB by default (D-07)
            "--monitor", args.monitor, "--natfeats", "yes", "--sound", "off",
            "--confirm-quit", "false", "--log-file", os.path.join(run_dir, "hatari.log")]
     if args.interactive:
@@ -57,8 +63,20 @@ def main():
     parser.add_argument("--image", choices=["st", "ste"], default="st")
     parser.add_argument("--machine", choices=["st", "megast", "ste", "megaste"])
     parser.add_argument("--monitor", choices=["rgb", "mono"], default="rgb")
+    parser.add_argument("--memsize", type=int, choices=sorted(BANKS), default=512,
+                        help="ST RAM in KB: the self-test's RAM probe must find it")
     parser.add_argument("--corrupt", action="store_true",
                         help="flip one payload byte: the ROM checksum must fail")
+    parser.add_argument("--stuck-line", type=int, metavar="N",
+                        help="make address line AN read as stuck: the self-test must say so")
+    parser.add_argument("--stuck-data", type=int, metavar="K",
+                        help="make data line DK read as stuck at 0: the self-test must say so")
+    parser.add_argument("--stress-fault", type=int, metavar="K",
+                        help="flip data line DK across the stress region: the stress reads must say so")
+    parser.add_argument("--stress-alias", type=int, metavar="N",
+                        help="make address line AN read as stuck across the stress region")
+    parser.add_argument("--soak", action="store_true",
+                        help="also run the 30-second soak from the self-test screen")
     parser.add_argument("--interactive", action="store_true",
                         help="open a window and hand over; no keys, no PASS/FAIL")
     args = parser.parse_args()
@@ -66,18 +84,45 @@ def main():
         args.machine = "st" if args.image == "st" else "ste"
     if (args.image == "st") != (args.machine in ("st", "megast")):
         hc.die(f"the {args.image} image does not boot on a {args.machine}")
+    if args.memsize == 2560 and args.machine != "st":
+        hc.die("2560 KB needs two different banks: only --machine st has them")
+    if args.image == "st" and BANKS[args.memsize][0] > 512:
+        # The ST image runs with the MMU set to 512 KB banks (startup_st.s).
+        # With 2 MB in bank 0 the ST's MMU then moves every address, and
+        # Hatari's native features read RAM without that translation: the
+        # trace comes out as garbage. The STE's MCU keeps them in place.
+        hc.die("on the st image, Hatari cannot trace with a 2 MB bank: "
+               "use --memsize 512 or 1024, or the ste image")
 
     try:
         image = hc.image_path(args.image)
     except hc.HarnessError as err:
         hc.die(str(err))
     label = f"hatari-{args.image}-{args.machine}-{args.monitor}" + \
-        ("-corrupt" if args.corrupt else "") + ("-interactive" if args.interactive else "")
+        (f"-ram{args.memsize}" if args.memsize != 512 else "") + \
+        ("-corrupt" if args.corrupt else "") + \
+        (f"-stuck-a{args.stuck_line}" if args.stuck_line else "") + \
+        (f"-stuck-d{args.stuck_data}" if args.stuck_data is not None else "") + \
+        (f"-stress-d{args.stress_fault}" if args.stress_fault is not None else "") + \
+        (f"-stress-a{args.stress_alias}" if args.stress_alias is not None else "") + \
+        ("-soak" if args.soak else "") + ("-interactive" if args.interactive else "")
     run_dir = hc.new_run_dir(label)
     os.makedirs(os.path.join(run_dir, "shots"))
     os.makedirs(os.path.join(run_dir, "home"))
     if args.corrupt:
         image = hc.corrupt_copy(image, os.path.join(run_dir, "corrupt.img"))
+    if args.stuck_line:
+        image = hc.stuck_line_copy(image, os.path.join(run_dir, "stuck.img"),
+                                   args.image, args.stuck_line)
+    if args.stuck_data is not None:
+        image = hc.stuck_data_copy(image, os.path.join(run_dir, "stuck-data.img"),
+                                   args.image, args.stuck_data)
+    if args.stress_fault is not None:
+        image = hc.stress_fault_copy(image, os.path.join(run_dir, "stress-fault.img"),
+                                     args.image, args.stress_fault)
+    if args.stress_alias is not None:
+        image = hc.stress_alias_copy(image, os.path.join(run_dir, "stress-alias.img"),
+                                     args.image, args.stress_alias)
 
     # A clean HOME: Hatari would otherwise load the user's saved configuration
     # (a GEMDOS drive, 4 MB of RAM). Headless unless interactive.
@@ -159,7 +204,11 @@ def main():
                        + (f"; screenshot {path}" if path else ""))
 
         hc.run_session(trace, press, shot, steps, args.image, args.corrupt,
-                       screen="mono" if args.monitor == "mono" else "medium")
+                       screen="mono" if args.monitor == "mono" else "medium",
+                       stuck_line=args.stuck_line, stuck_data=args.stuck_data,
+                       stress_fault=args.stress_fault, soak=args.soak,
+                       stress_alias=args.stress_alias,
+                       machine=args.machine, ram=BANKS[args.memsize])
     except (hc.HarnessError, socket.timeout, OSError) as err:
         error = str(err)
     finally:

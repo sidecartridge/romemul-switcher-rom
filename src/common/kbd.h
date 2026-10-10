@@ -20,6 +20,8 @@
 #define KEY_M 0x32U
 #define KEY_U 0x16U
 #define KEY_R 0x13U
+#define KEY_T 0x14U
+#define KEY_S 0x1FU
 
 unsigned char kbd_poll_scancode(void);
 unsigned char kbd_poll_scancode_wait(void);

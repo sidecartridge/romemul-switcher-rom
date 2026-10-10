@@ -120,8 +120,11 @@ static inline void glyphPlotMono(unsigned short col, unsigned short row,
 void glyph_plot(unsigned short col, unsigned short row, const unsigned char *rows,
                 unsigned char color) {
   const unsigned char medium = screen_is_medium_mode();
+  /* Mono has one plane: any colour but black draws white. Masking the index
+     drew green (2), the colour of "OK", as black (EPIC-03 STORY-08). */
   const unsigned char colorIdx =
-      (unsigned char)(medium ? (color & kMediumColorMask) : (color & kMonoColorMask));
+      (unsigned char)(medium ? (color & kMediumColorMask)
+                             : ((color & kMediumColorMask) != 0U ? 1U : 0U));
   if (medium) {
     glyphPlotMedium(col, row, rows, colorIdx);
   } else {

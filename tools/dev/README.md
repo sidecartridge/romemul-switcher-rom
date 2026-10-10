@@ -31,28 +31,53 @@ tools/dev/build.sh <st|ste|amiga> <release|debug|test|debug-test>
 ```bash
 tools/dev/build.sh st debug-test && python3 tools/dev/hatari_harness.py --image st
 tools/dev/build.sh amiga debug-test && python3 tools/dev/fsuae_harness.py
-tools/dev/all_harness.sh            # builds the three images, runs nine sessions, about a minute
+tools/dev/all_harness.sh            # builds release and debug+test images, runs 25 sessions, ~5 minutes
 ```
 
 The harnesses boot our own image as the system ROM: Hatari with `--tos` on an ST, Mega ST, STE
 or Mega STE, and FS-UAE with the image as the `kickstart_file` of an A500. Only debug+test
 images run there. Their catalog and parameters come from `src/common/test.c`, and their trace
-lines start with `@@ `. Every run uses 512 KB of RAM (D-07).
+lines start with `@@ `. Every run uses 512 KB of RAM (D-07) unless `--memsize`, `--chip` or
+`--slow` say otherwise.
 
 | script | flags |
 | --- | --- |
-| `hatari_harness.py` | `--image st\|ste`, `--machine st\|megast\|ste\|megaste`, `--monitor rgb\|mono`, `--corrupt`, `--interactive` |
-| `fsuae_harness.py` | `--corrupt`, `--no-warp`, `--interactive` |
+| `hatari_harness.py` | `--image st\|ste`, `--machine st\|megast\|ste\|megaste`, `--monitor rgb\|mono`, `--memsize 512\|1024\|2048\|2560\|4096`, `--corrupt`, `--stuck-line N`, `--stuck-data K`, `--stress-fault K`, `--stress-alias N`, `--soak`, `--interactive` |
+| `fsuae_harness.py` | `--chip 512\|1024\|2048`, `--slow 0\|512\|1024\|1536`, `--corrupt`, `--stuck-line N`, `--stuck-data K`, `--stress-fault K`, `--stress-alias N`, `--soak`, `--no-warp`, `--interactive` |
+
+`--stuck-line N` and `--stuck-data K` run a copy of the image where address line AN, or data
+line DK, reads as broken (its self-test word changed, the checksums recomputed): the self-test
+must name that line and only it. `--stress-fault K` flips data line DK in every pattern word
+of the stress region, and `--stress-alias N` makes address line AN read as stuck there: the
+stress reads must blame that line alone. `--soak` also presses S for the 30-second soak.
+
+`--memsize` (KB of ST RAM), `--chip` and `--slow` (KB of Amiga chip RAM and slow RAM at
+`0xC00000`) give the machine more RAM, and the self-test's RAM line must report it, bank by
+bank or part by part (EPIC-03 STORY-13). On the `st` image, Hatari cannot trace with 2 MB in
+bank 0 (2048, 2560 and 4096 KB): the switcher keeps the MMU at 512 KB banks, the ST's MMU then
+moves every address, and Hatari's native features read RAM without that translation. The
+harness refuses those sizes there; the `ste` image has no such limit. FS-UAE fits an ECS Agnus
+once chip RAM passes 512 KB, and the harness expects its ID.
 
 The session, the same on both emulators (`harness_common.run_session`):
 
-1. Boot, the build line, and on the ST the screen mode chosen.
-2. The ROM checksum. With `--corrupt`, one byte of covered random fill is flipped, so the
+1. Boot, the build line, and on the ST the screen mode chosen; the boot ping, which no
+   emulator answers.
+2. The ROM checksum. With `--corrupt`, one byte of the covered fill pattern is flipped, so the
    check must fail and a key must continue.
 3. The list with `test.c`'s entry count, default and rescue indices, and protocol 0x40.
-4. Down, page 2 and back, RETURN, ESC at the confirmation.
-5. Down, RETURN, a key, then the selection and the ROM's own reset.
-6. The second boot after that reset.
+4. The self-test (T): the rescue image's size and base, every address line and data line `ok` (or the one a `--stuck-*` run
+   broke), the stress reads with no error (or the line a `--stress-*` run broke), with
+   `--soak` the 30-second soak, 8 pings unanswered with 8 distinct nonces, the device tests skipped, the catalog
+   and the configuration as `test.c` holds them, the machine the emulator was started as
+   and, on the Atari, a stable monitor line, the RAM the emulator was given; the summary with
+   no failure but the injected fault and three tests skipped (the ping, which a test build
+   does not count as a failure, and the two device tests); then ESC back to the list.
+5. Down, page 2 and back, RETURN, ESC at the confirmation.
+6. Down, RETURN, a key, then the selection and the ROM's own reset.
+7. The second boot after that reset.
+8. No text ran past column 80 on any of those screens: a debug build traces
+   `@@ overflow row N` when it does (EPIC-03 STORY-12).
 
 Every run writes `tools/dev/logs/<time>-<label>/`, with `trace.txt` holding the `@@` lines, the
 emulator's log and output, and on Hatari `shots/` with the list, page 2, the confirmation and

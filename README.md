@@ -27,6 +27,15 @@ Kickstart, or AmigaOS. All platform code talks directly to the hardware.
 Once the machine enters Rescue Mode, this ROM will boot and show up as the
 rescue ROM/switcher image.
 
+In the ROM list, **T** runs the device self-test: it checks that the SidecarTridge serves
+every address and data line of the image, also under thousands of random reads, answers
+commands reliably and reads its flash consistently, checks the catalog and shows the
+configuration stored in the device, and names the machine it runs on, with its RAM (the ST's
+two banks, or the Amiga's chip and slow RAM) and the size of the rescue image. On its screen, **S**
+runs a 30-second soak of random reads with live counts. ESC returns to the list.
+
+Builds are reproducible: a clean build of a commit gives the same image bytes anywhere.
+
 For Rescue Mode usage on the SidecarTridge TOS Emulator, see the [official
 guide](https://docs.sidecartridge.com/sidecartridge-tos/user-guideV2/#rescue-mode).
 
@@ -128,15 +137,16 @@ Only canonical artifact names are published; timestamped variants are not genera
 - `dist/st/RSWIT192.PRG`
 - `dist/st/RESCUE_SWITCHER_v<version>_192KB.img`
 
-The final ROM image is finalized to exactly `192 KB`, with random filler in
-unused ROM space and a 32-bit big-endian checksum in the last 4 bytes.
+The final ROM image is finalized to exactly `192 KB`, with a computed pattern in
+unused ROM space (the self-test checks reads against it) and a 32-bit big-endian
+checksum in the last 4 bytes.
 
 ### Atari STE
 
 - `dist/ste/RSWIT256.PRG`
 - `dist/ste/RESCUE_SWITCHER_v<version>_256KB.img`
 
-The final ROM image is finalized to exactly `256 KB`, with random filler in
+The final ROM image is finalized to exactly `256 KB`, with a computed pattern in
 unused ROM space and a 32-bit big-endian checksum in the last 4 bytes.
 
 ### Amiga
@@ -145,7 +155,7 @@ unused ROM space and a 32-bit big-endian checksum in the last 4 bytes.
 
 The Amiga image is always emitted as a full `512 KB` Kickstart-style ROM,
 including kickety-split/footer/checksum information, and is validated with
-`romtool`. Unused ROM space is filled with random data, and a dedicated
+`romtool`. Unused ROM space holds a computed pattern, and a dedicated
 32-bit big-endian checksum field is stored immediately before the footer.
 
 ## Release Workflow

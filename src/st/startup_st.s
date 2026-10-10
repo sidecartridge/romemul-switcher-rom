@@ -23,6 +23,8 @@
 .extern __data_end
 .extern __bss_start
 .extern __bss_end
+.extern _st_ram_bytes
+.extern _st_ram_mmu
 
 #include "mem.h"
 
@@ -77,6 +79,12 @@ _main:
     jmp     ST_DIAG_CART_BASE+4
 nodiag:
 
+    /* Size the RAM banks for the self-test (EPIC-03 STORY-13), before any
+       RAM is used: d5 and d6 hold the result until .bss is cleared. Then
+       back to the MMU value the switcher runs with. */
+#include "memconf.inc"
+    move.b  #0x4, 0xffff8001.w
+
     /* Copy RAM-resident code+rodata from ROM image to RAM VMA. */
     lea     __ram_code_rom_start, %a0
     lea     __ram_code_start, %a1
@@ -106,4 +114,6 @@ nodiag:
     clr.b   %a0@+
     bra.s   4b
 5:
+    move.l  %d5, _st_ram_bytes
+    move.b  %d6, _st_ram_mmu
     jmp     _rom_switcher_main

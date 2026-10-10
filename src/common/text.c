@@ -11,6 +11,7 @@
 #include "glyph.h"
 #include "platform.h"
 #include "term.h"
+#include "trace.h"
 
 #ifndef APP_VERSION_STR
 #define APP_VERSION_STR "0.0.0"
@@ -49,6 +50,12 @@ static unsigned short gVt52SavedCol = 0U;
 static unsigned short gVt52SavedRow = 0U;
 static unsigned char gVt52Wrap = 1U;
 static unsigned char gVt52Reverse = 0U;
+#if defined(_DEBUG) && (_DEBUG > 0)
+/* Set when a character took the last column and the cursor wrapped by itself.
+   A character printed next, with no cursor move in between, ran past column
+   80: the trace says so and the harnesses fail on it (EPIC-03 STORY-12). */
+static unsigned char gTextWrapped = 0U;
+#endif
 
 static inline void textPutSpaceAt(unsigned short col, unsigned short row) {
   glyph_plot(col, row, glyph_lookup(' '), TERM_TEXT_COLOR);
@@ -140,6 +147,15 @@ static void textPutcRaw(char character) {
   unsigned short cursorCol = TERM_CURSOR_COL;
   unsigned short cursorRow = TERM_CURSOR_ROW;
 
+#if defined(_DEBUG) && (_DEBUG > 0)
+  if (gTextWrapped) {
+    gTextWrapped = 0U;
+    if (character != '\n') {
+      TRACE("overflow row %u", (unsigned int)cursorRow);
+    }
+  }
+#endif
+
   if (character == '\n') {
     cursorCol = 0;
     cursorRow++;
@@ -173,6 +189,9 @@ static void textPutcRaw(char character) {
       if (cursorRow >= SCR_HEIGHT_LINES) {
         cursorRow = 0;
       }
+#if defined(_DEBUG) && (_DEBUG > 0)
+      gTextWrapped = 1U;
+#endif
     } else {
       cursorCol = (unsigned short)(SCR_WIDTH_CHARS - 1U);
     }
@@ -293,6 +312,9 @@ static void textVt52Exec(unsigned char cmd) {
 void text_set_cursor(unsigned short col, unsigned short row) {
   if (col >= SCR_WIDTH_CHARS) col = 0;
   if (row >= SCR_HEIGHT_LINES) row = 0;
+#if defined(_DEBUG) && (_DEBUG > 0)
+  gTextWrapped = 0U;
+#endif
   TERM_CURSOR_COL = col;
   TERM_CURSOR_ROW = row;
 }
@@ -449,10 +471,10 @@ void text_build_title_line(char out[SCR_WIDTH_CHARS + 1],
 }
 
 /* Where the formatter writes: the screen by default, or the caller's buffer
-   while text_vsnprintf() runs (the debug trace, EPIC-00 STORY-02). */
+   while text_vsnprintf() runs (the debug trace, EPIC-00 STORY-02; the
+   self-test's wrapped details, EPIC-03 STORY-12). */
 static void (*gTextEmit)(char character) = text_putc;
 
-#if defined(_DEBUG) && (_DEBUG > 0)
 static char *gTextOut;
 static unsigned long gTextOutLeft;
 
@@ -462,7 +484,6 @@ static void textEmitToBuffer(char character) {
     gTextOutLeft--;
   }
 }
-#endif
 
 static void textEmitRepeat(char character, unsigned long count, int *written) {
   while (count--) {
@@ -799,6 +820,11 @@ static int textFormat(const char *fmt, va_list argList) {
   return written;
 }
 
+int text_vprintf(const char *fmt, va_list args) {
+  gTextEmit = text_putc;
+  return textFormat(fmt, args);
+}
+
 int text_printf(const char *fmt, ...) {
   va_list argList;
   int written;
@@ -809,7 +835,6 @@ int text_printf(const char *fmt, ...) {
   return written;
 }
 
-#if defined(_DEBUG) && (_DEBUG > 0)
 int text_vsnprintf(char *out, unsigned long size, const char *fmt,
                    va_list args) {
   int written;
@@ -825,7 +850,6 @@ int text_vsnprintf(char *out, unsigned long size, const char *fmt,
   *gTextOut = '\0';
   return written;
 }
-#endif
 
 unsigned short text_run_feature_tests(void) {
   unsigned short failures = 0U;
