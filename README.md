@@ -20,12 +20,18 @@ Kickstart, or AmigaOS. All platform code talks directly to the hardware.
    - Amiga 500/2000: `512 KB`
    - Latest releases: <https://github.com/sidecartridge/romemul-switcher-rom/releases>
 2. Copy the downloaded `.img` file into the `ROMEMUL` folder of the device.
-3. Rename the `RESCUE.TXT` file so it points to that ROM image name.
+3. Write that image's name in `RESCUE.TXT`, for example `RESCUE_SWITCHER_v4.0.0_192KB.img`.
 4. Safely eject the device from your computer.
 5. Enter Rescue Mode and boot the machine.
 
 Once the machine enters Rescue Mode, this ROM will boot and show up as the
 rescue ROM/switcher image.
+
+The rescue ROM must match the device's firmware: v4.0.0 talks to firmware v4.0.0 only, and a
+v3.1.0 rescue ROM stops at its incompatibility screen under firmware v4.0.0. The firmware's
+update file replaces the firmware only and keeps the `ROMEMUL` volume as it is, so a board
+updated from v3.1.0 still has its v3.1.0 rescue ROM: follow the steps above with the v4.0.0
+image after the update. The firmware's README, "Updating a board", has the whole procedure.
 
 In the ROM list, **T** runs the device self-test: it checks that the SidecarTridge serves
 every address and data line of the image, also under thousands of random reads, answers
