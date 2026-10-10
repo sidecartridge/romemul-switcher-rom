@@ -92,6 +92,8 @@ and EPIC-00. None is approved yet; each waits for Diego to choose it into an epi
   `16b66e1` for its test release images, ran on both boards on the Atari ST and the Amiga
   (Diego: "works great"), the rescue ROM booted both from the RESCUE input and through
   `RESCUE_TIMEOUT`. Not yet known from that report: whether a ROM was selected and booted on the
-  Amiga, which is where the reset race of C-07 would show.
+  Amiga, which is where the reset race of C-07 would show. Covered since by EPIC-03 STORY-15
+  (Diego, 2026-10-10): both boards, an ST, a Mega ST, an STE and an Amiga, a selection booting
+  "several times", the Amiga included.
 
 **Outcome:** _pending._
