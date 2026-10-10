@@ -2,7 +2,7 @@
 id: STORY-01
 epic: EPIC-02
 title: Release notes
-status: in-progress
+status: done
 ---
 
 ## Goal
@@ -37,4 +37,8 @@ upgrade, pointing at the firmware README's "Updating a board".
 
 The release builds of `bff73ec` (`tools/dev/build.sh <platform> release`, not `dist/`): all three
 named `RESCUE_SWITCHER_v4.0.0_<size>KB.img`, the "Rescue Switcher - v4.0.0" title in each, build
-ID `bff73ec`. Waiting for Diego's agreement with the notes.
+ID `bff73ec`.
+
+Diego, 2026-10-10: "ok to the notes".
+
+**Done 2026-10-10.**
