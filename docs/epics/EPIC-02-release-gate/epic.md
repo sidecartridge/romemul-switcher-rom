@@ -39,3 +39,9 @@ with the top section of `CHANGELOG.md` as the body.
 (EPIC-03 merged by pull request #4, with EPIC-01's commits). Diego: "start epic 2". The
 candidates still open in `ITERATIONS.md` (the Amiga reset race, the unbounded catalog walk, the
 ST keyboard overrun, a debug image on hardware) are not in v4.0.0 unless Diego chooses them.
+
+**Released 2026-10-10.** `v4.0.0` on `main` `561b13d`, published by `release.yml` with the three
+images, checked and pinned by hash in STORY-03. The release page's text was cleaned up after
+publication (one line per paragraph, no `# Changelog` title), and so were `CHANGELOG.md` and
+`release.yml`. Only `main` is left as a branch, locally and on GitHub (Diego). Open: the
+firmware's re-pin (STORY-04), waiting for Diego's go in the firmware repo.

@@ -32,7 +32,8 @@ jobs:
       id: changelog
       run: |
         echo "CHANGELOG<<EOF" >> "$GITHUB_ENV"
-        awk '/^---$/ { exit } { print }' CHANGELOG.md >> "$GITHUB_ENV"
+        # The top section, without the file's "# Changelog" title.
+        awk '/^---$/ { exit } /^# Changelog/ { next } { print }' CHANGELOG.md >> "$GITHUB_ENV"
         echo "EOF" >> "$GITHUB_ENV"
 
     - name: Copy release artifacts

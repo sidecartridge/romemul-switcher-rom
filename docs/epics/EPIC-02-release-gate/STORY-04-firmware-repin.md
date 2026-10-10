@@ -2,7 +2,7 @@
 id: STORY-04
 epic: EPIC-02
 title: The firmware re-pins (sync)
-status: todo
+status: in-progress
 ---
 
 ## Goal
@@ -12,7 +12,7 @@ SHA-256 (C-06, D-03).
 
 ## Tasks
 
-- [ ] The SHA-256 of the three release assets sent to the firmware session (or, if none is
+- [x] The SHA-256 of the three release assets sent to the firmware session (or, if none is
       running, to Diego with the file to change: `../sidecartos/DEFAULT_ROM/MANIFEST.txt`)
 - [ ] The firmware re-pins and its `tools/image/make_images.py --download` fetches the three
       files from the release; its note that the pins come from an uncommitted tree goes away
@@ -33,3 +33,12 @@ coming and will not match its pins: what EPIC-03 changed (no contract change; `C
 `CMD_RESTORE_PREVIOUS_ROM` as told on 2026-10-09), that the hashes depend on `main`'s commit, that
 CI and local builds of a commit are byte-identical, and that the three assets' SHA-256 follow
 the publication.
+
+2026-10-10, after the release: the three assets' SHA-256 sent to `sidecartos-ce` (STORY-03 has
+them). Its answer: in a scratch input folder with our hashes on its existing release URLs,
+`tools/image/make_images.py --download` fetched the three images from the v4.0.0 release and
+they matched; sizes, the v4.0.0 title and build ID `561b13d` right; both boards' release images
+built with them, 50 checks passed and 0 failed. The re-pin itself waits for Diego's go in the
+firmware repo, where he asked to hold it: `DEFAULT_ROM/MANIFEST.txt` with the three hashes, its
+note about the `0d827d3` test images replaced, probably with the host SWITCHER's re-pin
+(sidecartos-config `eb1dd0c`). The firmware session sends its commit when that lands.

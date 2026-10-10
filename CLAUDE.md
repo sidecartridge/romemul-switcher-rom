@@ -48,7 +48,7 @@ One source tree produces **three ROM images**, selected by `ROM_BASE_ADDR_UL` (n
 
 `st` and `ste` share `src/st/`; `src/st/switcher.c` derives the displayed model name from `ROM_BASE_ADDR_UL` (`0x00FC0000UL` → "Atari ST", `0x00E00000UL` → "Atari STE"). The ST build also emits a `ROMSWITC.PRG` (linked via `start.s`) that runs the same code as a TOS program for quick testing in Hatari. `start.s` is the **only** place allowed to touch the OS: it calls GEMDOS `Super(0)` when not already in supervisor mode, then never returns to TOS.
 
-`version.txt` is the single version source (`v4.0.0`; a leading `v` is stripped by the build scripts and both Makefiles before it becomes `-DAPP_VERSION_STR` and the artifact names). `CHANGELOG.md` is read by the release workflow up to the first `---` line.
+`version.txt` is the single version source (`v4.0.0`; a leading `v` is stripped by the build scripts and both Makefiles before it becomes `-DAPP_VERSION_STR` and the artifact names). `CHANGELOG.md` is read by the release workflow up to the first `---` line, without its `# Changelog` title. Write each paragraph and list item on one line: a GitHub release body keeps line breaks, so a wrapped paragraph breaks mid-sentence on the release page.
 
 ## Common commands
 
@@ -211,7 +211,7 @@ merged into `main`, where the `v4.0.0` tag is pushed.
 
 Iteration 1 is v4.0.0: EPIC-00, the Hatari and FS-UAE harness that boots the three images as
 system ROMs (D-06), done; EPIC-01, Diego's look at every screen with `--interactive`; EPIC-03, the device self-test (T in the list), done 2026-10-10; EPIC-02,
-the release gate (notes, CI, merges, the `v4.0.0` tag, the firmware's re-pin). The open defects found on 2026-10-09 are listed as
+the release gate (notes, CI, merges, the `v4.0.0` tag, the firmware's re-pin): v4.0.0 released 2026-10-10 from `main` `561b13d`, the firmware's re-pin pending. The open defects found on 2026-10-09 are listed as
 candidates in `ITERATIONS.md`: the constant nonce, the Amiga reset racing the firmware reboot
 (C-07), the mono cold boot on ST/STE, the unbounded catalog walk, and a debug image on hardware.
 EPIC-00 STORY-01 moved every build out of tree (`tools/dev/build.sh`), which ended the two
