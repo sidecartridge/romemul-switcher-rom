@@ -211,7 +211,7 @@ merged into `main`, where the `v4.0.0` tag is pushed.
 
 Iteration 1 is v4.0.0: EPIC-00, the Hatari and FS-UAE harness that boots the three images as
 system ROMs (D-06), done; EPIC-01, Diego's look at every screen with `--interactive`; EPIC-03, the device self-test (T in the list), done 2026-10-10; EPIC-02,
-the release gate (notes, CI, merges, the `v4.0.0` tag, the firmware's re-pin): v4.0.0 released 2026-10-10 from `main` `561b13d`, re-pinned by the firmware in its `454abda`. Iteration 1 is done. The open defects found on 2026-10-09 are listed as
+the release gate (notes, CI, merges, the `v4.0.0` tag, the firmware's re-pin): v4.0.0 released 2026-10-10 from `main` `561b13d`, re-pinned by the firmware in its `454abda` (on its `main` through `70237d3`). Iteration 1 is done. The open defects found on 2026-10-09 are listed as
 candidates in `ITERATIONS.md`: the constant nonce, the Amiga reset racing the firmware reboot
 (C-07), the mono cold boot on ST/STE, the unbounded catalog walk, and a debug image on hardware.
 EPIC-00 STORY-01 moved every build out of tree (`tools/dev/build.sh`), which ended the two

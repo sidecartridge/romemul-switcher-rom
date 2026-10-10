@@ -47,4 +47,4 @@ publication (one line per paragraph, no `# Changelog` title), and so were `CHANG
 firmware's re-pin (STORY-04), waiting for Diego's go in the firmware repo.
 
 **Closing, 2026-10-10.** The firmware re-pinned the three release images in its `454abda`
-(STORY-04), which reaches its `main` when Diego merges its `RP2350B` branch. Iteration 1 is done.
+(STORY-04), on its `main` through the merge `70237d3`. Iteration 1 is done.

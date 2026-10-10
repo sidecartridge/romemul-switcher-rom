@@ -43,8 +43,9 @@ firmware repo, where he asked to hold it: `DEFAULT_ROM/MANIFEST.txt` with the th
 note about the `0d827d3` test images replaced, probably with the host SWITCHER's re-pin
 (sidecartos-config `eb1dd0c`). The firmware session sends its commit when that lands.
 
-2026-10-10, the re-pin: firmware commit `454abda` on its `RP2350B` branch, committed locally there
-and not pushed yet; it reaches the firmware's `main` when Diego merges `RP2350B`. Checked here
+2026-10-10, the re-pin: firmware commit `454abda`, on the firmware's `main` since Diego merged its
+pull request #4 (merge commit `70237d3`, CI green for both boards, release and debug; checked
+here on GitHub). Checked here
 in `../sidecartos` (read-only): `DEFAULT_ROM/MANIFEST.txt` at `454abda` pins the three assets'
 SHA-256 at their v4.0.0 release URLs, its note names our v4.0.0 release tagged on `main` at
 `561b13d` and its reproducible builds, and no earlier rescue pin is left (the `0d827d3` ones,
