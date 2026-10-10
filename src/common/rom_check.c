@@ -38,7 +38,9 @@ static unsigned long add_range_be16(const volatile unsigned char *rom_base,
     offset += 2UL;
     *processed_bytes += 2UL;
 
-    if (((*processed_bytes % kProgressPollStrideBytes) == 0UL) ||
+    /* The stride is a power of two: a mask instead of '%', which at -O0
+       would call libgcc's ___umodsi3, absent in this freestanding build. */
+    if (((*processed_bytes & (kProgressPollStrideBytes - 1UL)) == 0UL) ||
         (*processed_bytes == total_bytes)) {
       platform_poll();
       if (progress_fn != (rom_check_progress_fn_t)0) {

@@ -11,15 +11,19 @@
 #include "commands.h"
 #include "kbd.h"
 #include "palloc.h"
+#include "platform.h"
+#include "selftest.h"
 #include "test.h"
 #include "text.h"
+#include "trace.h"
 
 enum {
+  kChooserSelfTest = -2, /* display_paginated_content(): T was pressed */
   kScreenWidthChars = 80,
   kPaginatedContentYOffset = 5,
   kMetadataFlagActive = 0x1U,
   kMetadataFlagRescue = 0x2U,
-  kSwitcherTosProtocolVersion = 0x0031,
+  kSwitcherTosProtocolVersion = 0x0040,
   kRomNameSize = 64,
   kRomDescriptionSize = 256,
   kRomCompressedClusterSize = 184,
@@ -29,8 +33,6 @@ enum {
 };
 
 #define ENDIAN_BIG 1
-#define FLASH_CATALOG_START 0xFF0000UL
-#define FLASH_PARAMS_START 0xFFF000UL
 #define READ_ROM_PAGE_SIZE 4096UL
 #define MEMORY_EXCHANGE_SIZE 61440UL
 #define MEMORY_PARAMS_EXCHANGE_SIZE 4096UL
@@ -54,8 +56,8 @@ static void copy_name(char dst[kRomNameSize], const unsigned char *src) {
   dst[i] = '\0';
 }
 
-static int parse_rom_description(unsigned char *rom_desc_raw,
-                                 unsigned char *rom_params_raw,
+static int parse_rom_description(const unsigned char *rom_desc_raw,
+                                 const unsigned char *rom_params_raw,
                                  rom_catalog_t **rom_desc) {
   unsigned long default_rom_index =
       (unsigned long)rom_params_raw[kDefaultRomIndex] |
@@ -75,6 +77,8 @@ static int parse_rom_description(unsigned char *rom_desc_raw,
     count++;
     scan_offset += kRomDescriptionSize;
   }
+  TRACE("list %d entries default=%lu rescue=%lu", count, default_rom_index,
+        rescue_rom_index);
 
   if (count <= 0) {
     *rom_desc = (rom_catalog_t *)0;
@@ -315,13 +319,16 @@ static int display_paginated_content(char *file_array, int num_files,
       text_set_cursor(0, -1 + current_line + 2 + i - start_index);
       deleteLineFromCursor();
     }
+    TRACE("page %d of %d drawn", page_number + 1, max_page + 1);
 
     unsigned char key;
     unsigned short change_page = 0U;
     while ((selected_rom < 0) && (!change_page)) {
       highlight_and_print(file_array, (unsigned short)current_index,
                           (unsigned short)start_index, current_line, 1U);
+      TRACE("waitkey index %d page %d", current_index, page_number + 1);
       key = kbd_poll_scancode_wait();
+      TRACE("key 0x%02x index %d", (unsigned int)key, current_index);
       switch (key) {
         case KEY_UP_ARROW:
           if (current_index > start_index) {
@@ -367,6 +374,8 @@ static int display_paginated_content(char *file_array, int num_files,
           return -1;
         case KEY_U:
           return -1;
+        case KEY_T:
+          return kChooserSelfTest;
         default:
           break;
       }
@@ -390,20 +399,16 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
   unsigned char *buffer =
       (unsigned char *)pa_alloc_aligned(MEMORY_EXCHANGE_SIZE, 16UL);
   if (!buffer) {
-    text_printf(
-        "OOM error allocating memory for the ROM buffer %lu-byte aligned "
-        "buffer.\r\n",
-        (unsigned long)MEMORY_EXCHANGE_SIZE);
+    text_printf("Out of memory for the %lu-byte ROM catalog buffer.\r\n",
+                (unsigned long)MEMORY_EXCHANGE_SIZE);
     return;
   }
 
   unsigned char *buffer_params =
       (unsigned char *)pa_alloc_aligned(MEMORY_PARAMS_EXCHANGE_SIZE, 16UL);
   if (!buffer_params) {
-    text_printf(
-        "OOM error allocating memory for the ROM parameters buffer %lu-byte "
-        "aligned buffer.\r\n",
-        (unsigned long)MEMORY_PARAMS_EXCHANGE_SIZE);
+    text_printf("Out of memory for the %lu-byte ROM parameters buffer.\r\n",
+                (unsigned long)MEMORY_PARAMS_EXCHANGE_SIZE);
     return;
   }
 
@@ -414,6 +419,28 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
   signed short protocol_version = 0;
 
   init_rom_address(rom_base_addr, trace_fn);
+
+  /* One ping before the first flash read (EPIC-03 STORY-10): a device that
+     does not answer is reported at once, not after the read's long timeout. */
+  {
+    static const char *const kBootPing[] = {"ok", "noanswer", "checksum",
+                                            "norestore"};
+    const int ping = command_ping();
+    (void)kBootPing; /* used by the trace only */
+    TRACE("bootping %s", kBootPing[(ping == 0) ? 0 : -ping]);
+#if (defined(_TEST) && (_TEST > 0))
+    text_printf("Device ping: %s (test build: the ROM list is built in)\r\n",
+                (ping == 0) ? "answered" : "no answer");
+#else
+    if (ping != 0) {
+      text_printf("The SidecarTridge does not answer commands: check that it is\r\n");
+      text_printf("seated well and running its v4 firmware.\r\n");
+      text_printf("Press any key to try reading it anyway...\r\n");
+      TRACE("waitkey");
+      kbd_wait_for_key_press();
+    }
+#endif
+  }
 
 #if (defined(_TEST) && (_TEST > 0))
   num_entries =
@@ -457,14 +484,31 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
 
   char *file_array = create_file_array(rom_descriptions, num_entries);
 
+  TRACE("protocol 0x%04x", (unsigned int)(unsigned short)protocol_version);
   if (protocol_version != kSwitcherTosProtocolVersion) {
     text_printf(
-        "This version of SWITCHER tool is not compatible with the firmware of "
-        "the device.\r\n");
+        "This rescue switcher is not compatible with the device's "
+        "firmware.\r\n");
     text_printf("Press any key to exit...\r\n");
+    TRACE("protocol mismatch");
+    TRACE("waitkey");
     kbd_wait_for_key_press();
     return;
   }
+
+  /* What the self-test (T in the list) checks against (EPIC-03). */
+  selftest_env_t selftest_env;
+  selftest_env.rom_base = rom_base_addr;
+  selftest_env.rom_size = platform_rom_image_size();
+#if (defined(_TEST) && (_TEST > 0))
+  selftest_env.params = flashParamsRaw;
+  selftest_env.catalog = flashCatalogRaw;
+#else
+  selftest_env.params = buffer_params;
+  selftest_env.catalog = buffer;
+#endif
+  selftest_env.entries = num_entries;
+  selftest_env.default_color = default_color;
 
   while (flow_control == 0) {
     text_clear();
@@ -478,12 +522,20 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
       text_printf(
           "No ROMs found. Do you have a Sidecartrige device configured?\r\n");
       text_printf("Press any key to exit...\r\n");
+      TRACE("no roms");
+      TRACE("waitkey");
       kbd_wait_for_key_press();
       return;
     } else {
       rom_number = display_paginated_content(
           file_array, num_entries, kElementsPerPage, "ROM images",
-          "[ENTER] or [RETURN] to load the ROM.");
+          "[ENTER] or [RETURN] to load the ROM. [T] to test the device.");
+    }
+
+    if (rom_number == kChooserSelfTest) {
+      selftest_run(&selftest_env);
+      rom_number = 0;
+      continue;
     }
 
     if (rom_number > 0) {
@@ -491,18 +543,24 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
 
       text_set_cursor(0, 22);
       deleteLineFromCursor();
-      text_printf("ROM image selected: %s\n",
-                  rom_descriptions[rom_number - 1].name);
+      /* 14 characters and a name of up to 63: within 80 columns. */
+      text_printf("Selected ROM: %s\n", rom_descriptions[rom_number - 1].name);
       deleteLineFromCursor();
       text_printf(
           "Press any key to load the ROM image and reset the computer (ESC to "
           "cancel).\r");
 
+      TRACE("confirm %d %s", rom_number - 1,
+            rom_descriptions[rom_number - 1].name);
+      TRACE("waitkey");
       confirm_key = kbd_wait_for_key_or_esc();
       if (confirm_key == KEY_ESC) {
+        TRACE("select cancelled");
         rom_number = 0;
         continue;
       }
+      TRACE("select %d %s", rom_number - 1,
+            rom_descriptions[rom_number - 1].name);
 
       flow_control = 1;
     }
@@ -510,5 +568,6 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
 
   deleteLineFromCursor();
   text_printf("Rebooting the computer with the new ROM...");
+  TRACE("reset rom %d", rom_number - 1);
   send_change_rom_command_and_hard_reset((unsigned char)(rom_number - 1));
 }

@@ -1,0 +1,7 @@
+# tools/dev/dev.cfg: local paths for the harnesses (git-ignored). Copy this file
+# to dev.cfg and edit it only when an emulator is not at its default path.
+# No ROM is needed: the harnesses boot this repository's own images.
+
+[emulators]
+hatari = /usr/local/bin/hatari
+fsuae = /Applications/FS-UAE.app/Contents/MacOS/fs-uae

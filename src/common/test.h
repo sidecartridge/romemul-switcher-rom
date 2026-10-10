@@ -14,13 +14,18 @@
 
 enum {
   kFlashParamsRawSize = 4096U,
-  kFlashCatalogRawSize = 61440U,
-  kFlashStorageRawSize = 65536U
+  /* The 33 records the test catalog holds, then the zero record that ends
+     the chooser's walk: the test image must stay under 64 KB for the
+     address-line layout (EPIC-03 STORY-03). */
+  kFlashCatalogRawSize = 8704U
 };
 
-extern unsigned char flashParamsRaw[kFlashParamsRawSize];
-extern unsigned char flashCatalogRaw[kFlashCatalogRawSize];
-extern unsigned char flashStorageRaw[kFlashStorageRawSize];
+/* The fake flash is read-only and stays in ROM: as RAM data it would not
+   fit the ST's RAM area (EPIC-00 STORY-02). The a.out objects of this
+   toolchain have no named sections, so const data lands in test.c.o's .text,
+   which both linker scripts place in ROM by file name (.romdata). */
+extern const unsigned char flashParamsRaw[kFlashParamsRawSize];
+extern const unsigned char flashCatalogRaw[kFlashCatalogRawSize];
 
 #endif /* _DEBUG || _TEST || TEST */
 

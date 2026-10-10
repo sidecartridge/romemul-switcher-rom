@@ -1,5 +1,7 @@
 DEBUG ?= 0
 TEST ?= 0
+# Set by tools/dev/build.sh (EPIC-00 STORY-01); shown on the checksum screen.
+BUILD_ID ?= unknown
 STARTUP_ROM_ASM ?= startup_ste.s
 STARTUP_ROM_OBJ := $(STARTUP_ROM_ASM).o
 ROM_BASE_ADDR_LD := $(patsubst %UL,%,$(patsubst %ul,%,$(ROM_BASE_ADDR_UL)))
@@ -56,18 +58,18 @@ ROM_IMAGE_NAME := RESCUE_SWITCHER_v$(APP_VERSION).img
 TARGET_ROM_BIN := $(BUILD_DIR)/$(ROM_IMAGE_NAME)
 NO_EXT_LIB_FLAGS := -nostdlib -nodefaultlibs -nostartfiles
 
-CFLAGS := -m68000 -std=gnu99 -ffreestanding -fomit-frame-pointer $(OPT_FLAGS) -Wall -Wextra -Werror $(NO_EXT_LIB_FLAGS) $(DEBUG_DEFS) $(TEST_DEFS) -DAPP_VERSION_STR=\"$(APP_VERSION)\" -DROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL)
-ASFLAGS_BASE := -m68000 -x assembler-with-cpp $(NO_EXT_LIB_FLAGS) $(DEBUG_DEFS) $(TEST_DEFS)
+CFLAGS := -m68000 -std=gnu99 -ffreestanding -fomit-frame-pointer $(OPT_FLAGS) -Wall -Wextra -Werror $(NO_EXT_LIB_FLAGS) $(DEBUG_DEFS) $(TEST_DEFS) -DAPP_VERSION_STR=\"$(APP_VERSION)\" -DBUILD_ID_STR=\"$(BUILD_ID)\" -DROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL) -MMD -MP
+ASFLAGS_BASE := -m68000 -x assembler-with-cpp $(NO_EXT_LIB_FLAGS) $(DEBUG_DEFS) $(TEST_DEFS) -MMD -MP
 ASFLAGS := $(ASFLAGS_BASE) -DROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL)
 LDFLAGS := $(NO_EXT_LIB_FLAGS) -Wl,--traditional-format,-Map=$(TARGET_MAP),--entry,_start
 LDFLAGS_ROM := $(NO_EXT_LIB_FLAGS) -Wl,-Map=$(TARGET_ROM_MAP),--entry,_os_entry,-T,$(ROM_LDSCRIPT),--oformat,binary
 
-SRCS_C := switcher.c text.c screen.c kbd.c glyph.c platform.c htrace.c palloc.c commands.c chooser.c rom_check.c
+SRCS_C := switcher.c text.c screen.c kbd.c glyph.c platform.c htrace.c palloc.c commands.c chooser.c rom_check.c trace.c nonce.c selftest.c
 ifeq ($(TEST),1)
 SRCS_C += test.c
 endif
-SRCS_S_PRG := start.s natfeat.s
-SRCS_S_ROM := $(STARTUP_ROM_ASM) natfeat.s
+SRCS_S_PRG := start.s natfeat.s probe.s
+SRCS_S_ROM := $(STARTUP_ROM_ASM) natfeat.s probe.s
 VPATH := . ../common
 
 # start.s must be linked first so PRG execution begins at _start.
@@ -75,11 +77,10 @@ OBJS_C := $(SRCS_C:%=$(BUILD_DIR)/%.o)
 OBJS_PRG := $(SRCS_S_PRG:%=$(BUILD_DIR)/%.o) $(OBJS_C)
 OBJS_ROM := $(SRCS_S_ROM:%=$(BUILD_DIR)/%.o) $(OBJS_C)
 
-ifeq ($(TEST),1)
-ALL_TARGETS := $(TARGET_PRG) $(TARGET_BIN)
-else
+
+# Every mode builds the ROM image; test builds keep their fake flash in ROM
+# (.romdata), so it fits (EPIC-00 STORY-01).
 ALL_TARGETS := $(TARGET_PRG) $(TARGET_BIN) $(TARGET_ROM_BIN)
-endif
 
 all: $(ALL_TARGETS)
 rom: $(TARGET_ROM_BIN)
@@ -88,7 +89,7 @@ rom: $(TARGET_ROM_BIN)
 FORCE:
 
 $(BUILD_CONFIG_STAMP): FORCE | $(BUILD_DIR)
-	@printf '%s\n' "ROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL) STARTUP_ROM_ASM=$(STARTUP_ROM_ASM) DEBUG=$(DEBUG) TEST=$(TEST)" > $@.tmp
+	@printf '%s\n' "ROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL) STARTUP_ROM_ASM=$(STARTUP_ROM_ASM) DEBUG=$(DEBUG) TEST=$(TEST) APP_VERSION=$(APP_VERSION) BUILD_ID=$(BUILD_ID)" > $@.tmp
 	@if [ ! -f $@ ] || ! cmp -s $@.tmp $@; then mv $@.tmp $@; else rm -f $@.tmp; fi
 
 $(BUILD_DIR)/%.c.o: %.c $(BUILD_CONFIG_STAMP) | $(BUILD_DIR)
@@ -122,3 +123,7 @@ clean:
 	  ../../build/st-debug-test
 
 .PHONY: all clean rom
+
+# Header dependencies written by the compiler (-MMD -MP). Last, so no rule
+# from a .d file becomes the default goal.
+-include $(sort $(OBJS_PRG:.o=.d) $(OBJS_ROM:.o=.d))

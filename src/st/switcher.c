@@ -9,13 +9,22 @@
 #include "../common/chooser.h"
 #include "../common/kbd.h"
 #include "../common/palloc.h"
+#include "../common/platform.h"
 #include "../common/rom_check.h"
 #include "../common/text.h"
+#include "../common/trace.h"
 #if defined(_DEBUG) && (_DEBUG > 0)
 #include "htrace.h"
 #endif
 #include "mem.h"
 #include "screen.h"
+
+#ifndef APP_VERSION_STR
+#define APP_VERSION_STR "0.0.0"
+#endif
+#ifndef BUILD_ID_STR
+#define BUILD_ID_STR "unknown"
+#endif
 
 enum {
   kStatusRegisterIplMask = 0x0700U,
@@ -29,6 +38,7 @@ enum {
   kCrcResultRow = 1U,
   kCrcDetailsRow = 2U,
   kCrcPromptRow = 4U,
+  kCrcBuildRow = 6U,
   kCrcSpinnerCol = 27U
 };
 
@@ -90,6 +100,9 @@ static void verify_rom_check_before_menu(void) {
   gCrcSpinnerIndex = 0U;
   text_clear();
   text_set_color(kColorDefault);
+  text_set_cursor(0U, kCrcBuildRow);
+  text_printf("Rescue Switcher v%s, %lu KB image, build %s", APP_VERSION_STR,
+              (unsigned long)ST_ROM_IMAGE_SIZE_BYTES >> 10, BUILD_ID_STR);
   text_set_cursor(0U, kCrcStatusRow);
   text_printf("Checking ROM checksum...");
 
@@ -97,6 +110,9 @@ static void verify_rom_check_before_menu(void) {
                    ST_ROM_IMAGE_SIZE_BYTES, ST_ROM_CRC_FIELD_OFFSET_BYTES, 0UL,
                    0UL, show_check_progress, &check_result);
 
+  TRACE("romcheck %s stored=%08lX computed=%08lX",
+        check_result.matches ? "ok" : "fail", check_result.stored_value,
+        check_result.computed_value);
   text_set_cursor(0U, kCrcResultRow);
   text_set_color(check_result.matches ? kColorSuccess : kColorFailure);
   text_printf("ROM checksum %s", check_result.matches ? "OK  " : "FAIL");
@@ -109,11 +125,14 @@ static void verify_rom_check_before_menu(void) {
     text_printf("Computed: %08lX", check_result.computed_value);
     text_set_cursor(0U, kCrcPromptRow);
     text_printf("Press any key to continue...");
+    TRACE("waitkey");
     kbd_wait_for_key_press();
   }
 
   text_set_color(kColorDefault);
-  text_set_cursor(0U, (unsigned short)(kCrcPromptRow + 2U));
+  /* Below the build line: the chooser goes on printing from here, and on the
+     build line's own row it left "Loading available ROM images...<id>". */
+  text_set_cursor(0U, (unsigned short)(kCrcBuildRow + 2U));
 }
 
 void rom_switcher_main(void) {
@@ -127,9 +146,11 @@ void rom_switcher_main(void) {
   setInterruptLevelMask(kPolledInterruptLevel);
 
 #if defined(_DEBUG) && (_DEBUG > 0)
-  hatari_trace_init();
+  platform_trace_init();
   hatari_trace_msg("[romswdbg] boot\n");
 #endif
+  TRACE("rescue v%s %s %s", APP_VERSION_STR, BUILD_ID_STR,
+        (ROM_BASE_ADDR_UL == 0x00E00000UL) ? "ste" : "st");
 
   screen_init();
 

@@ -20,12 +20,27 @@ Kickstart, or AmigaOS. All platform code talks directly to the hardware.
    - Amiga 500/2000: `512 KB`
    - Latest releases: <https://github.com/sidecartridge/romemul-switcher-rom/releases>
 2. Copy the downloaded `.img` file into the `ROMEMUL` folder of the device.
-3. Rename the `RESCUE.TXT` file so it points to that ROM image name.
+3. Write that image's name in `RESCUE.TXT`, for example `RESCUE_SWITCHER_v4.0.0_192KB.img`.
 4. Safely eject the device from your computer.
 5. Enter Rescue Mode and boot the machine.
 
 Once the machine enters Rescue Mode, this ROM will boot and show up as the
 rescue ROM/switcher image.
+
+The rescue ROM must match the device's firmware: v4.0.0 talks to firmware v4.0.0 only, and a
+v3.1.0 rescue ROM stops at its incompatibility screen under firmware v4.0.0. The firmware's
+update file replaces the firmware only and keeps the `ROMEMUL` volume as it is, so a board
+updated from v3.1.0 still has its v3.1.0 rescue ROM: follow the steps above with the v4.0.0
+image after the update. The firmware's README, "Updating a board", has the whole procedure.
+
+In the ROM list, **T** runs the device self-test: it checks that the SidecarTridge serves
+every address and data line of the image, also under thousands of random reads, answers
+commands reliably and reads its flash consistently, checks the catalog and shows the
+configuration stored in the device, and names the machine it runs on, with its RAM (the ST's
+two banks, or the Amiga's chip and slow RAM) and the size of the rescue image. On its screen, **S**
+runs a 30-second soak of random reads with live counts. ESC returns to the list.
+
+Builds are reproducible: a clean build of a commit gives the same image bytes anywhere.
 
 For Rescue Mode usage on the SidecarTridge TOS Emulator, see the [official
 guide](https://docs.sidecartridge.com/sidecartridge-tos/user-guideV2/#rescue-mode).
@@ -47,35 +62,42 @@ guide](https://docs.sidecartridge.com/sidecartridge-kickstart/user-guide/#rescue
 - Amiga 500/2000 hardware-specific code in `src/amiga/`
 - Direct hardware keyboard handling on both platforms
 - `80`-column menu on Amiga using hires `2`-bitplane display (`4` colors)
-- Toolchain lives in Docker through [`stcmd`](https://github.com/sidecartridge/atarist-toolkit-docker)
+- Toolchain lives in Docker: the pinned [`atarist-toolkit-docker`](https://github.com/sidecartridge/atarist-toolkit-docker)
+  image builds all three images, and a small pinned image runs `romtool` and the image finalizer
 
 ## Repository Layout
 
 ```text
 romemul-switcher-rom/
-├── AGENTS.md
+├── CLAUDE.md
 ├── LICENSE
 ├── Makefile
 ├── README.md
-├── build.sh
+├── build.sh               # release build: publishes to dist/
 ├── dist/                  # published artifacts
+├── docs/epics/            # backlog: iterations, epics, stories, decisions
+├── scripts/               # finalize_rom.py, clang-checks.sh
 ├── src/
 │   ├── amiga/             # Amiga 500/2000 platform code
 │   ├── common/            # shared chooser/text/protocol code
 │   └── st/                # Atari ST/STE platform code
-└── build/                 # intermediate build outputs
+├── tools/dev/             # out-of-tree builds and pinned toolchain images
+└── build/                 # intermediate outputs of a direct `make`
 ```
 
 ## Requirements
 
 1. Docker Desktop or compatible container runtime
-2. `stcmd` from
-   [`atarist-toolkit-docker`](https://github.com/sidecartridge/atarist-toolkit-docker/releases/latest)
-3. POSIX shell environment on macOS, Linux, or WSL2
+2. `git` and `bash` on macOS, Linux, or WSL2
+
+The toolchain images are pulled or built on first use: the Atari GCC image
+`logronoide/atarist-toolkit-docker-x86_64:1.4.0`, pinned by digest, and
+`romemul-switcher-rom/romtool:1` (amitools 0.8.1), built from
+`tools/dev/docker/romtool/`. Both are named in `tools/dev/toolchain.sh`.
 
 ## Build
 
-Platform is mandatory unless you use `all`.
+Release images, published to `dist/<platform>/`. Platform is mandatory unless you use `all`.
 
 ```bash
 ./build.sh st
@@ -84,16 +106,18 @@ Platform is mandatory unless you use `all`.
 ./build.sh all
 ```
 
-Optional build modes:
+Debug and test images are built out of tree into `tools/dev/builds/<platform>-<type>/` and
+never reach `dist/`:
 
 ```bash
-./build.sh st debug
-./build.sh ste test
-./build.sh amiga debug
-./build.sh amiga test
-./build.sh all debug
-./build.sh all test
+tools/dev/build.sh st debug        # -O0 -g, trace on
+tools/dev/build.sh ste test        # catalog and parameters from src/common/test.c
+tools/dev/build.sh amiga debug-test
+tools/dev/build.sh st release      # a release image, without publishing it
 ```
+
+Every build carries a build ID: the commit, `-dirty.<hash>` when the sources differ from it,
+and `+debug` or `+test`.
 
 Platform build parameters:
 
@@ -111,7 +135,7 @@ Platform build parameters:
 
 ## Artifacts
 
-Release artifacts are published under `dist/<platform>/` when `test` is not enabled.
+Release artifacts are published under `dist/<platform>/` by `./build.sh` only.
 Only canonical artifact names are published; timestamped variants are not generated.
 
 ### Atari ST
@@ -119,15 +143,16 @@ Only canonical artifact names are published; timestamped variants are not genera
 - `dist/st/RSWIT192.PRG`
 - `dist/st/RESCUE_SWITCHER_v<version>_192KB.img`
 
-The final ROM image is finalized to exactly `192 KB`, with random filler in
-unused ROM space and a 32-bit big-endian checksum in the last 4 bytes.
+The final ROM image is finalized to exactly `192 KB`, with a computed pattern in
+unused ROM space (the self-test checks reads against it) and a 32-bit big-endian
+checksum in the last 4 bytes.
 
 ### Atari STE
 
 - `dist/ste/RSWIT256.PRG`
 - `dist/ste/RESCUE_SWITCHER_v<version>_256KB.img`
 
-The final ROM image is finalized to exactly `256 KB`, with random filler in
+The final ROM image is finalized to exactly `256 KB`, with a computed pattern in
 unused ROM space and a 32-bit big-endian checksum in the last 4 bytes.
 
 ### Amiga
@@ -136,7 +161,7 @@ unused ROM space and a 32-bit big-endian checksum in the last 4 bytes.
 
 The Amiga image is always emitted as a full `512 KB` Kickstart-style ROM,
 including kickety-split/footer/checksum information, and is validated with
-`romtool`. Unused ROM space is filled with random data, and a dedicated
+`romtool`. Unused ROM space holds a computed pattern, and a dedicated
 32-bit big-endian checksum field is stored immediately before the footer.
 
 ## Release Workflow
@@ -207,10 +232,10 @@ These targets are implemented through `scripts/clang-checks.sh`.
 - If you change memory layout constants, update startup and linker assumptions together
 - `version.txt` may contain a leading `v`; build logic strips it before generating artifact names
 - New `.c`, `.h`, and `.s` files should use the standard project file header block
-- Preferred validation after shared changes:
-  - `./build.sh all`
-  - `./build.sh all debug`
-  - `./build.sh all test`
+- Preferred validation after any change:
+  - `tools/dev/all_harness.sh`: builds the three debug+test images and runs them in Hatari
+    and FS-UAE (see `tools/dev/README.md`)
+  - `tools/dev/build.sh <platform> release` for each of `st`, `ste` and `amiga`
 
 ## License
 
