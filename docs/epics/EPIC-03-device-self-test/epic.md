@@ -2,7 +2,7 @@
 id: EPIC-03
 iteration: 1
 title: A self-test of the device, from the rescue ROM
-status: todo
+status: done
 ---
 
 ## Goal
@@ -20,7 +20,7 @@ command)".
   ping, command-reliability, flash-read, catalog-and-configuration and machine-information
   tests; a ping at boot; trace lines and harness sessions for each; Diego's check on the bench.
 - Out of scope: any new firmware command (a shared-contract change, D-03); a RAM test of the
-  computer.
+  computer (its RAM size is in scope: STORY-13).
 
 ## Platforms
 
@@ -40,7 +40,11 @@ an STE and an Amiga.
 - STORY-08: Catalog and parameters sanity
 - STORY-09: Machine information
 - STORY-10: A quick ping at boot
-- STORY-11: Verification (Diego's checkpoint)
+- STORY-11: Stress reads and a 30-second soak
+- STORY-12: Every line within 80 columns
+- STORY-13: The rescue image's size and the machine's RAM
+- STORY-14: The resolution set in the vertical blank
+- STORY-15: Verification (Diego's checkpoint)
 
 ## Notes
 
@@ -72,3 +76,18 @@ Diego, 2026-10-09: "add 1, 2, 3, 4, 5, 6 and 7, then start epic 3". The seven su
 STORY-04 (data lines), STORY-06 (command reliability), STORY-07 (flash reads), STORY-08
 (catalog and configuration), STORY-01 (the nonce, first because the ping tests depend on it),
 STORY-09 (machine information) and STORY-10 (the boot ping).
+
+Diego, 2026-10-10, after the first run on hardware ("it works"): lines longer than 80
+columns, the rescue image's own size, and the machine's RAM. They are STORY-12 and STORY-13,
+before the verification, which became STORY-14.
+
+Diego, 2026-10-10, with photos of the 256 KB image on a Mega ST in mono: "Look at the left
+column, we have again the problem found in the high res initialization." The last 4 bytes of
+every line showed at its start. That is STORY-14, and the verification became STORY-15.
+
+**Closing, 2026-10-10.** Diego ran the release images on the bench and agreed (STORY-15): both
+boards, an ST, a Mega ST in mono and colour, an STE and an Amiga; every self-test line right,
+the soak with no error, selections that boot, every line within 80 columns, the image size and
+the RAM right, and the mono display in place after a cold boot. Then the self-test screen by
+eye in Hatari and FS-UAE, where a test build now skips the ping instead of failing it.
+Uncommitted on `epic-03-device-self-test`.
