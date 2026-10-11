@@ -7,6 +7,7 @@ done in and why, and how it ends. One iteration per release.
 | Iteration | Theme | Status |
 | --- | --- | --- |
 | 1 | **v4.0.0**: the rescue ROM that ships in firmware v4.0.0's release images, protocol 0x40, exercised in Hatari and FS-UAE and seen on hardware | done 2026-10-10 |
+| 2 | After v4.0.0: work deferred out of the release | planned |
 
 ---
 
@@ -97,3 +98,22 @@ and EPIC-00. None is approved yet; each waits for Diego to choose it into an epi
   "several times", the Amiga included.
 
 **Outcome:** _pending._
+
+---
+
+## Iteration 2: after v4.0.0
+
+Work kept out of v4.0.0. No epics and no order yet.
+
+### Candidates, not yet epics
+
+- **"Press any key to exit..." exits nowhere.** The incompatibility screen, "No ROMs found" and
+  the flash read errors in `chooser_loop()` wait for a key and return. `rom_switcher_main()`
+  then returns too, but every ROM startup enters it with `jmp`, so its `rts` pops whatever long
+  sits at the top of the stack: the first long of screen memory on the ST and STE
+  (`ST_STACK_TOP_ADDR_UL` is the screen base), the long at `0x80000` on the Amiga. What the
+  machine does next is undefined, most likely a hang with the message still on screen. Read from
+  the code on 2026-10-11, while answering the firmware session about the v4.0.0 user docs; not
+  observed on the bench or in the emulators, where the release image reaches this path because
+  no device answers. The v4.0.0 user docs tell users to switch off after any "exit" message.
+  Added by Diego, 2026-10-11.
