@@ -58,9 +58,9 @@ tools/dev/build.sh ste debug-test  # types: release | debug | test | debug-test 
 ./build.sh st                      # release build, published to dist/st/ (st | ste | amiga | all)
 ./build.sh all                     # replaces dist/, so tell the firmware first (C-06)
 tools/dev/romtool.sh info <img>    # the pinned romtool (amitools 0.8.1), repo-relative paths
-tools/dev/all_harness.sh           # build all release and debug-test images, run 25 sessions (~5 min)
-python3 tools/dev/hatari_harness.py --image ste --machine megaste   # one session; also --monitor mono, --memsize KB, --corrupt, --stuck-line N, --stuck-data K
-python3 tools/dev/fsuae_harness.py # the Amiga session over the serial port; also --chip KB, --slow KB, --corrupt, --stuck-line N, --stuck-data K, --no-warp
+tools/dev/all_harness.sh           # build all release and debug-test images, run 31 sessions (~5 min)
+python3 tools/dev/hatari_harness.py --image ste --machine megaste   # one session; also --monitor mono, --memsize KB, --corrupt, --stuck-line N, --stuck-data K, --exit mismatch|empty|erased
+python3 tools/dev/fsuae_harness.py # the Amiga session over the serial port; also --chip KB, --slow KB, --corrupt, --stuck-line N, --stuck-data K, --exit mismatch|empty|erased, --no-warp
 tools/dev/measure_builds.sh        # payload and free space of every image, as a Markdown table
 make clean                         # removes build/st* and build/amiga* (outputs of a direct make)
 make format-check                  # clang-format dry run over src/**/*.{c,h}

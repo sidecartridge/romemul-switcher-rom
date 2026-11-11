@@ -129,8 +129,6 @@ void rom_switcher_main(void) {
       AMIGA_RAM_VARS_BASE_ADDR + AMIGA_RAM_VARS_SIZE_BYTES;
   const unsigned long heapSize =
       (heapBase < ramEnd) ? (ramEnd - heapBase) : 0UL;
-  pa_init(heapBase, heapSize);
-
   setInterruptLevelMask(kPolledInterruptLevel);
 
 #if defined(_DEBUG) && (_DEBUG > 0)
@@ -141,15 +139,23 @@ void rom_switcher_main(void) {
   screen_init();
   text_init();
 
-  text_clear();
-  text_set_color(kColorDefault);
-  verify_rom_check_before_menu();
+  /* The startup enters here with jmp, so there is nothing to return to.
+     chooser_loop() returns only after a screen that waited for a key (a flash
+     read error, a protocol mismatch, no ROMs): start again from the checksum,
+     with an empty heap (EPIC-04 STORY-01). */
+  for (;;) {
+    pa_init(heapBase, heapSize);
+    text_clear();
+    text_set_color(kColorDefault);
+    verify_rom_check_before_menu();
 
 #if defined(_DEBUG) && (_DEBUG > 0)
-  chooser_loop(ROM_BASE_ADDR_UL, platform_trace_write, kColorDefault,
-               "Amiga 500/2000");
+    chooser_loop(ROM_BASE_ADDR_UL, platform_trace_write, kColorDefault,
+                 "Amiga 500/2000");
 #else
-  chooser_loop(ROM_BASE_ADDR_UL, (helper_trace_fn_t)0, kColorDefault,
-               "Amiga 500/2000");
+    chooser_loop(ROM_BASE_ADDR_UL, (helper_trace_fn_t)0, kColorDefault,
+                 "Amiga 500/2000");
 #endif
+    TRACE("restart");
+  }
 }

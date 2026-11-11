@@ -41,6 +41,9 @@ runs=(
   "hatari --image st --memsize 1024"
   "hatari --image ste --memsize 4096"
   "hatari --image ste --machine megaste --memsize 2048"
+  "hatari --image st --exit mismatch"
+  "hatari --image ste --exit empty"
+  "hatari --image st --exit erased"
   "fsuae"
   "fsuae --corrupt"
   "fsuae --stuck-line 18"
@@ -50,6 +53,9 @@ runs=(
   "fsuae --stress-alias 18"
   "fsuae --chip 1024 --slow 512"
   "fsuae --chip 2048 --slow 1536"
+  "fsuae --exit mismatch"
+  "fsuae --exit empty"
+  "fsuae --exit erased"
 )
 for run in "${runs[@]}"; do
   read -r emulator flags <<< "$run"

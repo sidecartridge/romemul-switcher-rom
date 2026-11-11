@@ -38,7 +38,7 @@ tools/dev/build.sh <st|ste|amiga> <release|debug|test|debug-test|screenshot>
 ```bash
 tools/dev/build.sh st debug-test && python3 tools/dev/hatari_harness.py --image st
 tools/dev/build.sh amiga debug-test && python3 tools/dev/fsuae_harness.py
-tools/dev/all_harness.sh            # builds release and debug+test images, runs 25 sessions, ~5 minutes
+tools/dev/all_harness.sh            # builds release and debug+test images, runs 31 sessions, ~5 minutes
 ```
 
 The harnesses boot our own image as the system ROM: Hatari with `--tos` on an ST, Mega ST, STE
@@ -49,14 +49,18 @@ lines start with `@@ `. Every run uses 512 KB of RAM (D-07) unless `--memsize`, 
 
 | script | flags |
 | --- | --- |
-| `hatari_harness.py` | `--image st\|ste`, `--machine st\|megast\|ste\|megaste`, `--monitor rgb\|mono`, `--memsize 512\|1024\|2048\|2560\|4096`, `--corrupt`, `--stuck-line N`, `--stuck-data K`, `--stress-fault K`, `--stress-alias N`, `--soak`, `--interactive` |
-| `fsuae_harness.py` | `--chip 512\|1024\|2048`, `--slow 0\|512\|1024\|1536`, `--corrupt`, `--stuck-line N`, `--stuck-data K`, `--stress-fault K`, `--stress-alias N`, `--soak`, `--no-warp`, `--interactive` |
+| `hatari_harness.py` | `--image st\|ste`, `--machine st\|megast\|ste\|megaste`, `--monitor rgb\|mono`, `--memsize 512\|1024\|2048\|2560\|4096`, `--corrupt`, `--stuck-line N`, `--stuck-data K`, `--stress-fault K`, `--stress-alias N`, `--soak`, `--exit mismatch\|empty\|erased`, `--interactive` |
+| `fsuae_harness.py` | `--chip 512\|1024\|2048`, `--slow 0\|512\|1024\|1536`, `--corrupt`, `--stuck-line N`, `--stuck-data K`, `--stress-fault K`, `--stress-alias N`, `--soak`, `--exit mismatch\|empty\|erased`, `--no-warp`, `--interactive` |
 
 `--stuck-line N` and `--stuck-data K` run a copy of the image where address line AN, or data
 line DK, reads as broken (its self-test word changed, the checksums recomputed): the self-test
 must name that line and only it. `--stress-fault K` flips data line DK in every pattern word
 of the stress region, and `--stress-alias N` makes address line AN read as stuck there: the
 stress reads must blame that line alone. `--soak` also presses S for the 30-second soak.
+`--exit` changes the built-in data so the chooser ends on a screen that waits for a key: the
+protocol word one higher (`mismatch`), or record 0 starting with `0x00` (`empty`) or `0xFF`
+(`erased`, erased flash). The key must start again from the checksum and reach the same screen
+(EPIC-04 STORY-01, STORY-02).
 
 `--memsize` (KB of ST RAM), `--chip` and `--slow` (KB of Amiga chip RAM and slow RAM at
 `0xC00000`) give the machine more RAM, and the self-test's RAM line must report it, bank by

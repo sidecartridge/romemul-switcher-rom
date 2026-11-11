@@ -32,10 +32,12 @@ import harness_common as hc  # noqa: E402
 SCANCODES = {"up": "0x48", "down": "0x50", "left": "0x4b", "right": "0x4d",
              "return": "0x1c", "esc": "0x01", "any": "0x39", "t": "0x14", "s": "0x1f"}
 KEY_TIMEOUT = 4.0
-# After a key's release, time for the ROM to read the break code before the next
-# press: its ACIA poll is about 28 ms apart in a debug build, and a press while
-# the release is unread overruns the ACIA and is lost (EPIC-00 STORY-02). 0.2 s
-# of host time is seconds of emulated time under fast-forward.
+# After a key's release, a pause before the next press. Until EPIC-04 STORY-03
+# the ROM polled the ACIA about 28 ms apart in a debug build and dropped a byte
+# on an overrun, so a press while the release was unread was lost (EPIC-00
+# STORY-02); it now polls without a gap and keeps an overrun's byte, and the
+# session passes with no pause. Kept as margin: 0.2 s of host time is seconds
+# of emulated time under fast-forward.
 RELEASE_PAUSE = 0.2
 # ST RAM sizes Hatari takes, in KB, and the banks it fills: bank 0, bank 1
 # (Hatari's stMemory.c, STMemory_RAM_SetBankSize). 2560 needs the ST's Ricoh
@@ -77,6 +79,9 @@ def main():
                         help="make address line AN read as stuck across the stress region")
     parser.add_argument("--soak", action="store_true",
                         help="also run the 30-second soak from the self-test screen")
+    parser.add_argument("--exit", choices=sorted(hc.EXITS),
+                        help="change the built-in data so the chooser ends on that "
+                             "screen: a key must start it again")
     parser.add_argument("--interactive", action="store_true",
                         help="open a window and hand over; no keys, no PASS/FAIL")
     args = parser.parse_args()
@@ -105,7 +110,8 @@ def main():
         (f"-stuck-d{args.stuck_data}" if args.stuck_data is not None else "") + \
         (f"-stress-d{args.stress_fault}" if args.stress_fault is not None else "") + \
         (f"-stress-a{args.stress_alias}" if args.stress_alias is not None else "") + \
-        ("-soak" if args.soak else "") + ("-interactive" if args.interactive else "")
+        ("-soak" if args.soak else "") + \
+        (f"-exit-{args.exit}" if args.exit else "") + ("-interactive" if args.interactive else "")
     run_dir = hc.new_run_dir(label)
     os.makedirs(os.path.join(run_dir, "shots"))
     os.makedirs(os.path.join(run_dir, "home"))
@@ -123,6 +129,8 @@ def main():
     if args.stress_alias is not None:
         image = hc.stress_alias_copy(image, os.path.join(run_dir, "stress-alias.img"),
                                      args.image, args.stress_alias)
+    if args.exit:
+        image = hc.exit_copy(image, os.path.join(run_dir, "exit.img"), args.image, args.exit)
 
     # A clean HOME: Hatari would otherwise load the user's saved configuration
     # (a GEMDOS drive, 4 MB of RAM). Headless unless interactive.
@@ -203,12 +211,15 @@ def main():
             steps.fail(f"key {key}", f"no {expect!r} after two presses"
                        + (f"; screenshot {path}" if path else ""))
 
-        hc.run_session(trace, press, shot, steps, args.image, args.corrupt,
-                       screen="mono" if args.monitor == "mono" else "medium",
-                       stuck_line=args.stuck_line, stuck_data=args.stuck_data,
-                       stress_fault=args.stress_fault, soak=args.soak,
-                       stress_alias=args.stress_alias,
-                       machine=args.machine, ram=BANKS[args.memsize])
+        if args.exit:
+            hc.run_exit_session(trace, press, shot, steps, args.image, args.exit)
+        else:
+            hc.run_session(trace, press, shot, steps, args.image, args.corrupt,
+                           screen="mono" if args.monitor == "mono" else "medium",
+                           stuck_line=args.stuck_line, stuck_data=args.stuck_data,
+                           stress_fault=args.stress_fault, soak=args.soak,
+                           stress_alias=args.stress_alias,
+                           machine=args.machine, ram=BANKS[args.memsize])
     except (hc.HarnessError, socket.timeout, OSError) as err:
         error = str(err)
     finally:
