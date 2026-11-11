@@ -2,7 +2,7 @@
 id: EPIC-07
 iteration: 2
 title: The v4.0.0 re-issue gate
-status: todo
+status: done
 ---
 
 ## Goal
@@ -43,3 +43,5 @@ new run replaces the assets of the existing release.
 
 The new images carry the build ID of the new commit, which is the only thing on screen that tells
 them from `561b13d`'s.
+
+**Done 2026-11-11.** v4.0.0 re-issued from `main` `09bd579`, its three images checked (STORY-02) and re-pinned by the firmware in its `68d6fb8` (STORY-03). Iteration 2 is done.

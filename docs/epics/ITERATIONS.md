@@ -113,6 +113,9 @@ Exercised in Hatari and FS-UAE before every bench pass, seen on both boards, and
 the firmware's own re-issued v4.0.0. Diego, 2026-11-11: "iteration 2 is going to overwrite
 v4.0.0", then "write the epics and stories for the new iteration".
 
+**Done 2026-11-11.** v4.0.0 re-issued from `main` `09bd579` (#7, #8), its images checked and
+re-pinned by the firmware in its `68d6fb8` (on its `iteration-2` branch).
+
 ### Since v4.0.0
 
 The screenshot build (`tools/dev/build.sh <platform> screenshot`) was added on 2026-10-11,
