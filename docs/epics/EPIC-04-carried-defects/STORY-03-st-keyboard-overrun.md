@@ -2,7 +2,7 @@
 id: STORY-03
 epic: EPIC-04
 title: The ST keyboard keeps its keys
-status: in-progress
+status: done
 ---
 
 ## Goal
@@ -17,7 +17,8 @@ between polls.
   the byte.
 - [x] The empty-poll delay of 2,500 loops (`kPollDelayLoops`) goes, or shrinks to what the
   ACIA needs. That gap is about 28 ms in a debug build, measured in Hatari (EPIC-00 STORY-02).
-- [ ] Measure the poll gap in Hatari before and after, in a debug build and a release build.
+- [x] Measure the poll gap in Hatari before and after, in a debug build and a release build.
+  Closed by Diego, 2026-11-11, on the lost-key test below instead of a timing.
 - [x] Harness: all sessions pass with no key retries, and the soak's ESC still stops it.
 
 ## Acceptance
@@ -31,13 +32,14 @@ list (arrows held down, RETURN then ESC at once) are never lost on an ST.
 - The IKBD sends at 7,812.5 baud, so a byte arrives about every 1.28 ms. The ACIA holds one
   byte, so a 28 ms gap can lose a key release and the next key's make code.
 
-**Built and run 2026-11-11**, on `epic-04-carried-defects`, uncommitted. Open: the poll gap as a time.
+**Done 2026-11-11**, on `epic-04-carried-defects` (code in `eab5634`).
 
 - **The error mask.** `kIkbdStatusErrMask` (0x70) became `kIkbdStatusBadByteMask` (0x50). A
   framing or parity error still drops the byte, but an overrun no longer does.
 - **The delay.** `kbdDelay()` and `kPollDelayLoops` are gone. `kbd_poll_scancode_wait()` now
   polls without a gap.
-- **Measured as lost keys, not as a time; the timing task stays open.** The poll gap itself was not timed. What was
+- **Measured as lost keys, not as a time.** Diego, 2026-11-11: "close timing task". The gap
+  itself was the 2,500-loop delay, which is gone, so the polls now follow one another directly. The poll gap itself was not timed. What was
   measured instead is whether keys are lost. The Hatari harness waits 0.2 s after each key's
   release (`RELEASE_PAUSE`), which hid the gap, so the ST session was run with no pause:
   - the old code, 2 runs: both FAIL, a lost key each time ("key right" and "key down" after two
