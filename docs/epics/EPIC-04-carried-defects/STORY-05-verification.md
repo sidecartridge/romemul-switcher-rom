@@ -2,7 +2,7 @@
 id: STORY-05
 epic: EPIC-04
 title: Verification (Diego's checkpoint)
-status: todo
+status: in-progress
 ---
 
 ## Goal
@@ -15,7 +15,7 @@ did.
 - [ ] An error screen on hardware: power the board in Rescue Mode with an empty or freshly
   formatted flash, or force a read error. The message says what a key does, and a key does
   it. On an ST and an Amiga (Diego).
-- [ ] Quick keys on an ST or Mega ST: no key lost in the list, the confirmation and the
+- [x] Quick keys on an ST or Mega ST: no key lost in the list, the confirmation and the
   self-test (Diego)
 - [ ] The list, the self-test, the soak and a selection that boots: the same as v4.0.0, on both
   boards, on an ST, an STE and an Amiga (Diego)
@@ -37,4 +37,12 @@ Debug images are still never put on hardware, even after STORY-04.
     with no error. Only the start-up path was exercised there.
   - No task is checked yet. Still to confirm: the RP2350A, the STE, the self-test, the soak, a
     selection, quick keys and an error screen.
+- 2026-11-11, Diego, for both images on the Mega ST: "all ok, both boards, no error screen
+  tested". The self-test, the soak, a selection and quick keys all OK, on the RP2350A and the
+  RP2350B. Quick keys checked.
+  - Still open in the third task: the Amiga, and a real STE or Mega STE (so far the 256 KB
+    image ran only on the Mega ST, through its 256 KB decoder).
+  - The error screen was not tested on hardware. On the bench it can hardly be reached: the
+    rescue image is always in the catalog, and a read error cannot be forced. The release
+    image in Hatari showed it (STORY-01). Diego to decide whether that is enough.
 
