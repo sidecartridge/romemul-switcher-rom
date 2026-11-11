@@ -12,14 +12,15 @@ did.
 
 ## Tasks
 
-- [ ] An error screen on hardware: power the board in Rescue Mode with an empty or freshly
+- [x] An error screen on hardware: power the board in Rescue Mode with an empty or freshly
   formatted flash, or force a read error. The message says what a key does, and a key does
-  it. On an ST and an Amiga (Diego).
+  it. On an ST and an Amiga (Diego). Closed without hardware: Diego cannot reproduce one on
+  the bench (2026-11-11), so the release image in Hatari stands for it (STORY-01).
 - [x] Quick keys on an ST or Mega ST: no key lost in the list, the confirmation and the
   self-test (Diego)
 - [ ] The list, the self-test, the soak and a selection that boots: the same as v4.0.0, on both
   boards, on an ST, an STE and an Amiga (Diego)
-- [ ] The release images' build ID and checksum line right (Diego)
+- [x] The release images' build ID and checksum line right (Diego)
 
 ## Acceptance
 
@@ -45,4 +46,9 @@ Debug images are still never put on hardware, even after STORY-04.
   - The error screen was not tested on hardware. On the bench it can hardly be reached: the
     rescue image is always in the catalog, and a read error cannot be forced. The release
     image in Hatari showed it (STORY-01). Diego to decide whether that is enough.
+- 2026-11-11, Diego: "Mega ST with decoder is equivalent to ST and Mega STE." So the 256 KB
+  image on the Mega ST counts for the STE, and the Atari part of the third task is done. Only
+  the Amiga is left there. Also: "Build ID is correct" (`f5cb491`; neither image stopped at a
+  checksum prompt), and "I can't reproduce errror screen on hardware". The first task is closed
+  on the Hatari result.
 
