@@ -7,7 +7,7 @@ done in and why, and how it ends. One iteration per release.
 | Iteration | Theme | Status |
 | --- | --- | --- |
 | 1 | **v4.0.0**: the rescue ROM that ships in firmware v4.0.0's release images, protocol 0x40, exercised in Hatari and FS-UAE and seen on hardware | done 2026-10-10 |
-| 2 | After v4.0.0: work deferred out of the release | planned |
+| 2 | **v4.0.0 re-issued** (D-09): the defects carried over from the first issue, the Amiga reset after a selection, and the A19 test with a 1 MB Amiga rescue image | planned |
 
 ---
 
@@ -63,7 +63,7 @@ and EPIC-00. None is approved yet; each waits for Diego to choose it into an epi
   from the old image and meets the undriven bus partway through its boot. The ST waits about
   2.9 s first and is fine. A fix needs a wait of at least 0.5 s run from RAM and then a reset
   that does not depend on the old image, which contradicts `CLAUDE.md`'s rule to keep the reset
-  stub in ROM: Diego's call.
+  stub in ROM: Diego's call. Now EPIC-05 (iteration 2, 2026-11-11).
 - **ST/STE cold boot on a monochrome monitor** can come up in medium resolution: `screen_init()`
   reads MFP GPIP bit 7 once, right after startup, and never again. A warm reset works. Fix:
   sample after a short delay until the bit is stable. Hatari can check the mono render path, not
@@ -73,17 +73,18 @@ and EPIC-00. None is approved yet; each waits for Diego to choose it into an epi
 - **The catalog walk is unbounded.** `parse_rom_description()` stops only at a record whose first
   byte is 0x00; an erased catalog (all 0xFF, a flash never reindexed) makes it walk past its
   61,440-byte buffer. Mirror sidecartos-config `448fd03`: stop at 240 records and at a first
-  byte of 0x00 or 0xFF.
+  byte of 0x00 or 0xFF. Now EPIC-04 STORY-02 (iteration 2, 2026-11-11).
 - **The ST keyboard driver drops keys on an ACIA overrun.** `src/st/kbd.c` discards any byte
   read with an error flag set, overrun included, although on an overrun the byte in the
   receive register is valid. Its empty-poll delay of 2,500 loops makes overruns likely: about
   28 ms between polls in a debug build, measured in Hatari (EPIC-00 STORY-02). A key pressed
   within a poll gap of the previous release is lost. Fix: keep the byte on overrun, and poll
-  without the long delay.
+  without the long delay. Now EPIC-04 STORY-03 (iteration 2, 2026-11-11).
 - **A debug image must not reach hardware.** `natfeat.s` detects Hatari's native features with
   the illegal opcode 0x7300, which Hatari intercepts; on a real ST in ROM mode it traps through
   an exception vector nothing has set. Debug images are for Hatari only, or the debug build
-  installs a vector that answers "no native features".
+  installs a vector that answers "no native features". Now EPIC-04 STORY-04 (iteration 2,
+  2026-11-11).
 - **The build line collides with the loading line.** Fixed in EPIC-03 STORY-10, on the screen
   that story changed.
 - **Hardware verification of v4.0.0**: the three images on the RP2350A and the RP2350B, each
@@ -101,13 +102,40 @@ and EPIC-00. None is approved yet; each waits for Diego to choose it into an epi
 
 ---
 
-## Iteration 2: after v4.0.0
+## Iteration 2: v4.0.0 re-issued
 
-Work kept out of v4.0.0. No epics and no order yet.
+**Goal:** New images published as `v4.0.0` again, replacing those of `561b13d` (D-09):
+- the defects of the first issue fixed;
+- an Amiga reset that waits for the firmware;
+- a self-test that checks the Amiga's A19 line from a 1 MB rescue image.
+
+Exercised in Hatari and FS-UAE before every bench pass, seen on both boards, and re-pinned by
+the firmware's own re-issued v4.0.0. Diego, 2026-11-11: "iteration 2 is going to overwrite
+v4.0.0", then "write the epics and stories for the new iteration".
+
+### Since v4.0.0
+
+The screenshot build (`tools/dev/build.sh <platform> screenshot`) was added on 2026-10-11,
+outside any epic. It came from the firmware session's request for the user docs' captures,
+approved by Diego. It is uncommitted. The release images built from that tree are byte for byte
+v4.0.0's.
+
+### Implementation path
+
+Epic numbers are the execution order. One epic at a time, each on its own `epic-NN-<slug>`
+branch cut from a new `release/v4.0.0` and merged into it by pull request (D-05). Each epic ends
+with Diego's checkpoint.
+
+| # | Epic | Why at this point |
+| --- | --- | --- |
+| EPIC-04 | The defects carried over from v4.0.0 | First: four small fixes, none waiting on a sibling. Each is one file and a harness session: the exit screens, the catalog walk, the ST keyboard overrun, and a debug image on hardware. |
+| EPIC-05 | The Amiga reset waits for the firmware | C-07's race, the last open candidate of iteration 1. It comes before EPIC-06 because the 1 MB image runs from the board's flash slot, and a reset that no longer reads the ROM should be in place before the image layout changes. Needs Diego's call on replacing the ROM-stub rule of `CLAUDE.md`. |
+| EPIC-06 | The A19 line on the Amiga, and a 1 MB rescue image | Asked by Diego through the firmware session, 2026-11-11, and placed after the two epics that depend on nothing else. It waits on firmware EPIC-17 (option 1, chosen by Diego), on where the firmware puts the slot's owner record (firmware D-13), and on Diego's answer about GPIO 25 on the A500 and A2000 carriers. |
+| EPIC-07 | The v4.0.0 re-issue gate | Last: the notes, the merges, moving the tag, and the firmware's re-pin. |
 
 ### Candidates, not yet epics
 
-- **"Press any key to exit..." exits nowhere.** The incompatibility screen, "No ROMs found" and
+- **"Press any key to exit..." exits nowhere.** Now EPIC-04 STORY-01 (Diego, 2026-11-11). The incompatibility screen, "No ROMs found" and
   the flash read errors in `chooser_loop()` wait for a key and return. `rom_switcher_main()`
   then returns too, but every ROM startup enters it with `jmp`, so its `rts` pops whatever long
   sits at the top of the stack: the first long of screen memory on the ST and STE
