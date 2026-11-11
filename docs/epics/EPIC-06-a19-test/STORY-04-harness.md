@@ -20,7 +20,9 @@ are exercised before the bench.
 - [ ] Sessions:
   - the 1 MB image with both halves served (A19 `ok`);
   - the 1 MB image with the high marker overwritten (A19 `stuck`);
-  - the 512 KB image on a Gayle model (A19 `skipped`), and on the A500 model (A19 `n/a`).
+  - a 1 MB file of two low halves, as the board's mirror serves a 512 KB image, with the
+    record clear (A19 `skipped`);
+  - the 512 KB image on the A500 model, where nothing answers at `$E00000` (A19 `n/a`).
 
   All four are added to `all_harness.sh`.
 - [ ] The test build's parameters page carries the "slot holds the rescue half" value that each
