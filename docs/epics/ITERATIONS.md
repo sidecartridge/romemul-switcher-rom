@@ -128,7 +128,7 @@ with Diego's checkpoint.
 
 | # | Epic | Why at this point |
 | --- | --- | --- |
-| EPIC-04 | The defects carried over from v4.0.0 | First: four small fixes, none waiting on a sibling. Each is one file and a harness session: the exit screens, the catalog walk, the ST keyboard overrun, and a debug image on hardware. |
+| EPIC-04 | The defects carried over from v4.0.0 | First: four small fixes, none waiting on a sibling. Each is one file and a harness session: the error screens that now try again, the catalog walk, the ST keyboard overrun, and a debug image on hardware. |
 | EPIC-05 | The Amiga reset waits for the firmware | C-07's race, the last open candidate of iteration 1. Amiga only, and needs Diego's call on replacing the ROM-stub rule of `CLAUDE.md`. |
 | EPIC-06 | The ROM size the Amiga supports, in the self-test | Asked by Diego through the firmware session, 2026-11-11, first as an A19 test with a 1 MB rescue image. Diego dropped the 1 MB image the same day: the self-test now only shows whether the machine takes a 512 KB or a 1 MB ROM, read from whether `$E00000` holds the rescue image. No change to the shared contract. Needs the re-issued firmware's 512 KB mirror fix to boot on the A600. |
 | EPIC-07 | The v4.0.0 re-issue gate | Last: the notes, the merges, moving the tag, and the firmware's re-pin. |

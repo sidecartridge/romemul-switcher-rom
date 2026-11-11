@@ -31,7 +31,7 @@ only. The verification covers both boards on an ST or Mega ST, an STE and an Ami
 
 ## Stories
 
-- STORY-01: Every exit screen leads somewhere
+- STORY-01: Error screens that try again
 - STORY-02: A bounded catalog walk
 - STORY-03: The ST keyboard keeps its keys
 - STORY-04: A debug image that does not trap on hardware

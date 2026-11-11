@@ -12,7 +12,7 @@ did.
 
 ## Tasks
 
-- [ ] An exit screen on hardware: power the board in Rescue Mode with an empty or freshly
+- [ ] An error screen on hardware: power the board in Rescue Mode with an empty or freshly
   formatted flash, or force a read error. The message says what a key does, and a key does
   it. On an ST and an Amiga (Diego).
 - [ ] Quick keys on an ST or Mega ST: no key lost in the list, the confirmation and the

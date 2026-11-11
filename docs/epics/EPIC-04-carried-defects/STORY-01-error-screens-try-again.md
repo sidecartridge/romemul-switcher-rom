@@ -1,8 +1,8 @@
 ---
 id: STORY-01
 epic: EPIC-04
-title: Every exit screen leads somewhere
-status: in-progress
+title: Error screens that try again
+status: done
 ---
 
 ## Goal
@@ -19,7 +19,7 @@ something defined and useful. Today it falls into `rts` from a function that was
   - the catalog page read error;
   - the protocol mismatch;
   - "No ROMs found".
-- [ ] Diego chooses what a key does on these screens: start again from the boot ping, or a cold
+- [x] Diego chooses what a key does on these screens: start again from the boot ping, or a cold
   reset into the rescue ROM, which the firmware still serves. Recommended: start again. A board
   that answered late, or a page that failed once, gets a second chance without a power cycle,
   and a cold reset adds nothing a power cycle doesn't. Record the choice here.
@@ -47,10 +47,13 @@ flash read error and comes back to it after a key, instead of hanging. On hardwa
 - The v4.0.0 user docs tell users to switch off after any exit message. Tell the firmware
   session when this changes, so the docs can follow.
 
-**Built and run 2026-11-11**, on `epic-04-carried-defects`, uncommitted. Open: Diego's choice.
+**Done 2026-11-11**, on `epic-04-carried-defects`, uncommitted.
 
-- **The choice.** Built as the recommendation, start again, because Diego said "ok, start"
-  without choosing. The task stays open until he confirms it, or picks the cold reset.
+- **The choice.** Try again. Diego, 2026-11-11: "ok, try again is fine. rename it". A cold
+  reset would boot the same rescue ROM, since the firmware is still in Rescue Mode, so it would
+  only be slower. Neither leaves Rescue Mode: only a selection or switching off does.
+- **Renamed** from "Every exit screen leads somewhere" (`STORY-01-exit-screens.md`). The
+  rescue ROM has nothing to exit to: these are error screens, and their key tries again.
 - **The loop.** `rom_switcher_main()` loops forever on both platforms. Each pass calls
   `pa_init()`, clears the screen, runs the checksum screen and `chooser_loop()`, then traces
   `@@ restart`. Only the chooser and the self-test allocate, so resetting the heap is enough.
