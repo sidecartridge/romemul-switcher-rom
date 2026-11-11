@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-The **bare-metal rescue ROM switcher** for the **SidecarTridge ROM Emulator** family (TOS Emulator and Kickstart Emulator). It is a ROM image that the cartridge's Pico firmware (`../sidecartos`) boots *instead of* the system ROM when the device is in **Rescue Mode**. It runs on the retro computer (Atari ST/Mega ST, Atari STE/Mega STE, Amiga 500/2000), lists the ROM images stored in the cartridge's flash, lets the user pick one, tells the firmware to make it the boot ROM, and hard-resets the machine.
+The **bare-metal rescue ROM switcher** for the **SidecarTridge ROM Emulator** family (TOS Emulator and Kickstart Emulator). It is a ROM image that the cartridge's Pico firmware (`../sidecartos`) boots *instead of* the system ROM when the device is in **Rescue Mode**. It runs on the retro computer (Atari ST/Mega ST, Atari STE/Mega STE, Amiga 500, 500+, 600 and 2000), lists the ROM images stored in the cartridge's flash, lets the user pick one, tells the firmware to make it the boot ROM, and hard-resets the machine.
 
 It is **fully freestanding**: no TOS, GEMDOS, BIOS, XBIOS, Kickstart or AmigaOS calls anywhere in the runtime; no libc; `LIBS`/`LDLIBS` must stay empty (the Makefiles error out otherwise). All platform code talks to the hardware registers directly with interrupts masked and everything polled.
 
@@ -44,7 +44,7 @@ One source tree produces **three ROM images**, selected by `ROM_BASE_ADDR_UL` (n
 |---|---|---|---|---|
 | `st` | `0x00FC0000UL` | `src/st/startup_st.s` | `RESCUE_SWITCHER_v<ver>_192KB.img` | Atari ST / Mega ST (192 KB TOS slot) |
 | `ste` | `0x00E00000UL` | `src/st/startup_ste.s` | `RESCUE_SWITCHER_v<ver>_256KB.img` | Atari STE / Mega STE (256 KB TOS slot) |
-| `amiga` | `0x00F80000UL` | `src/amiga/startup.s` | `RESCUE_SWITCHER_v<ver>_512KB.img` | Amiga 500/2000, full 512 KB Kickstart-replacement ROM |
+| `amiga` | `0x00F80000UL` | `src/amiga/startup.s` | `RESCUE_SWITCHER_v<ver>_512KB.img` | Amiga 500, 500+, 600 and 2000, full 512 KB Kickstart-replacement ROM |
 
 `st` and `ste` share `src/st/`; `src/st/switcher.c` derives the displayed model name from `ROM_BASE_ADDR_UL` (`0x00FC0000UL` → "Atari ST", `0x00E00000UL` → "Atari STE"). The ST build also emits a `ROMSWITC.PRG` (linked via `start.s`) that runs the same code as a TOS program for quick testing in Hatari. `start.s` is the **only** place allowed to touch the OS: it calls GEMDOS `Super(0)` when not already in supervisor mode, then never returns to TOS.
 
