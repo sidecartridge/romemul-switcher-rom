@@ -2,7 +2,7 @@
 id: EPIC-06
 iteration: 2
 title: The Amiga's bus chip, Gary or Gayle, in the self-test
-status: in-progress
+status: done
 ---
 
 ## Goal
@@ -57,3 +57,5 @@ the firmware could say whether A19 ever goes high. Diego chose to show the bus c
 
 **Started 2026-11-11** on `epic-06-bus-chip`, cut from `epic-05-amiga-reset`. Diego: "start epic
 06".
+
+**Done 2026-11-11.** Diego's bench check passed with the release images of `f5cb491` (see the verification story). The code reaches `release/v4.0.0` through EPIC-07.

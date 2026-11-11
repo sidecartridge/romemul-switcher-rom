@@ -2,7 +2,7 @@
 id: STORY-05
 epic: EPIC-04
 title: Verification (Diego's checkpoint)
-status: in-progress
+status: done
 ---
 
 ## Goal
@@ -18,7 +18,7 @@ did.
   the bench (2026-11-11), so the release image in Hatari stands for it (STORY-01).
 - [x] Quick keys on an ST or Mega ST: no key lost in the list, the confirmation and the
   self-test (Diego)
-- [ ] The list, the self-test, the soak and a selection that boots: the same as v4.0.0, on both
+- [x] The list, the self-test, the soak and a selection that boots: the same as v4.0.0, on both
   boards, on an ST, an STE and an Amiga (Diego)
 - [x] The release images' build ID and checksum line right (Diego)
 
@@ -52,3 +52,4 @@ Debug images are still never put on hardware, even after STORY-04.
   checksum prompt), and "I can't reproduce errror screen on hardware". The first task is closed
   on the Hatari result.
 
+**Done 2026-11-11**, the Amiga image of `f5cb491` (`ee6ce3ce…`). Diego: "i can confirm all the new images work in amiga, st 192kb and ste 256kb", and, asked which checks that covers, confirmed all four: the list, the self-test, the soak and ten selections in a row on an A500 or A2000 on both boards; ten selections on the A600 with the RP2350B; the red screen before each reset, a wait that does not bother; and the bus chip line, "Gayle (ID 0xD0)" on the A600 and "Gary (no Gayle ID)" on the A500 or A2000 on both boards, with no hang. That closes the third task: the Atari part was done above.

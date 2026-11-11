@@ -2,7 +2,7 @@
 id: EPIC-04
 iteration: 2
 title: The defects carried over from v4.0.0
-status: in-progress
+status: done
 ---
 
 ## Goal
@@ -50,3 +50,5 @@ is one file and one harness session.
 working tree. STORY-01 to STORY-04 were built and run the same day, uncommitted. `all_harness.sh`
 passed 31 of 31 with 0 key retries. Open: Diego's choice for STORY-01, the timed poll gap of
 STORY-03, and the bench (STORY-05).
+
+**Done 2026-11-11.** Diego's bench check passed with the release images of `f5cb491` (see the verification story). The code reaches `release/v4.0.0` through EPIC-07.
