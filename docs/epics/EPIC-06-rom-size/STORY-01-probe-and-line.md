@@ -37,3 +37,8 @@ hardware: STORY-03.
 - The words must be ones the image never changes at runtime and a mirror cannot fake. The
   address-test signatures and the fill pattern qualify. Open bus or another ROM at `$E00000`
   will not match several of them.
+- The result is right even when the slot holds a 1 MB default ROM's upper half. In rescue mode
+  emul serves the slot only for an image above 512 KB, and it decides from the image it serves
+  (`serve_slot = slot != 0 && rom_flash_size > 512 KB`, `emul/src/tosemul.c:1237`, firmware
+  working tree, uncommitted, checked read-only 2026-11-11). So the 512 KB rescue is served from
+  SRAM on both halves. Re-check the line once the mirror fix (firmware EPIC-16) is committed.
