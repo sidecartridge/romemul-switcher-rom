@@ -34,3 +34,4 @@ here.
 
 - `release/v4.0.0` and the epic branches were deleted after iteration 1. They are cut again from
   `main` (D-05).
+- 2026-11-11: one pull request for the whole iteration (Diego: "we can have a single one for this"), #7, `epic-07-reissue-gate` into `release/v4.0.0`. The epic branches 04 to 06 are all inside it. The firmware session was told the bench check passed, and that the hashes come after the release.
