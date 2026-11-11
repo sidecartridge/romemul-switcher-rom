@@ -547,6 +547,9 @@ def run_session(trace, press, shot, steps, platform, corrupt, screen=None,
     need("confirm entry 1", rf"@@ confirm 1 {re.escape(names[1])}\n@@ waitkey\n")
     press("any", rf"@@ select 1 {re.escape(names[1])}\n")
     need("reset", r"@@ reset rom 1\n")
+    if platform == "amiga":
+        # A second of frames, from RAM, before the reset (EPIC-05 STORY-01).
+        need("reset waits a second", r"@@ reset wait (50|60) frames\n@@ reset now\n")
     need("boot after reset", rf"@@ rescue v{ver} \S+ {platform}\n", 90)
     # No text ran past column 80 on any screen (EPIC-03 STORY-12).
     overflow = re.search(rb"@@ overflow row \d+\n", trace.data)

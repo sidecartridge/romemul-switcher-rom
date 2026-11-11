@@ -102,7 +102,8 @@ File map, for orientation:
 | `st/platform.c` | magic-sequence inline asm per ROM base, hard reset |
 | `st/natfeat.s`, `st/htrace.c` | Hatari NatFeats trace (`_DEBUG` only) |
 | `st/mem.h`, `st/rom_abs.ld.S` | RAM layout with `_Static_assert` guards; ROM linker script template |
-| `amiga/startup.s` | ROM bootstrap: overlay off, code/`.data` copy to RAM, `.bss` clear, ROM-resident `_platform_hard_reset` |
+| `amiga/startup.s` | ROM bootstrap: overlay off, code/`.data` copy to RAM, `.bss` clear |
+| `amiga/reset.s` | `amiga_cold_reset`: `reset` and `jmp` through offset 2, run from RAM (EPIC-05) |
 | `amiga/screen.c` | hires 2-bitplane display and framebuffer, DiagROM-inspired structure |
 | `amiga/kbd.c` | CIAA keyboard polling and handshake |
 | `amiga/glyph.c` | bitplane-aware glyph renderer |
@@ -118,7 +119,7 @@ The firmware cannot be addressed as a device: the host can only *read* ROM. Comm
 - **Reply channel**: the firmware overwrites the first bytes of the emulated ROM. Base+0 echoes the nonce when the command completed (`0xFFFFFFFD` = checksum error); base+4 is where block data, checksum and status appear (`kReadRomBlockSize` 512 B + checksum word). `send_sync_rom_command` spins on base+0 with a retry budget, calling `platform_poll()` each iteration.
 - **Commands used here** (`commands.c` enum): `kCmdSelectRom 0x0000`, `kCmdUnlockReadBlockMemory 0x0008`, `kCmdLockReadBlockMemory 0x000A`. The parameter is always shifted left one bit (addresses must be even); `kCmdSelectRom` additionally **Hamming-encodes** the ROM index (`hamming_encode`). The host-side tool has many more commands (write, erase, rename…); this ROM is read-only by design.
 - **Flash reads**: `read_flash_block` (512 B, verified against the remote checksum, `kMaxCommandRetries` 16) and `read_flash_page` (4 KB = 8 blocks; the `endian` flag word-swaps because the Pico stores little-endian). Flash **offsets** are relative to the Pico's `XIP_BASE`: `FLASH_CATALOG_START 0xFF0000`, `FLASH_PARAMS_START 0xFFF000` (`chooser.c`). They **must match the firmware's linker scripts**.
-- **Selecting a ROM** = `send_change_rom_command_and_hard_reset(index)`: one async `kCmdSelectRom` then `platform_hard_reset()`. **`SELECT_ROM` is never echoed**: the firmware leaves its command loop, `write_rom_list()` erases and rewrites the parameters page, then `watchdog_reboot()`, and the ROM is off the bus for about 26 to 29 ms until the emulator is up again. On ST the reset path masks interrupts, busy-waits about 2.9 s at 8 MHz (covering that gap), clears the three memvalid magics (`0x420`, `0x43A`, `0x51A`) so TOS does a cold start, and jumps through the reset vector at address 4. On Amiga the stub lives in ROM `.boot` because RAM code is gone after reset; it runs with **no delay**, which is an open issue (C-07, and the candidates in `docs/epics/ITERATIONS.md`).
+- **Selecting a ROM** = `send_change_rom_command_and_hard_reset(index)`: one async `kCmdSelectRom` then `platform_hard_reset()`. **`SELECT_ROM` is never echoed**: the firmware leaves its command loop, `write_rom_list()` erases and rewrites the parameters page, then `watchdog_reboot()`, and the ROM is off the bus for about 26 to 29 ms until the emulator is up again. On ST the reset path masks interrupts, busy-waits about 2.9 s at 8 MHz (covering that gap), clears the three memvalid magics (`0x420`, `0x43A`, `0x51A`) so TOS does a cold start, and jumps through the reset vector at address 4. On Amiga (EPIC-05, D-10) `platform_hard_reset()` turns the screen red and waits one second of frames from RAM, where the old image cannot reach it, then `amiga_cold_reset` (`src/amiga/reset.s`, linked into RAM) runs Commodore's cold reboot: `reset` and `jmp (a0)` to offset 2 in one longword, so the 68000 has fetched the jump before the overlay maps ROM over that RAM. Nothing reads the old image after `SELECT_ROM`; `scripts/finalize_rom.py` refuses an image where the pair is not longword-aligned.
 
 ## Catalog and parameters
 
@@ -141,7 +142,7 @@ Platform-facing interfaces are `glyph.h`, `kbd.h`, `platform.h`, `term.h`; `src/
 
 - **Display**: ST uses the shifter directly (screen memory at `ST_SCREEN_BASE_ADDR`, 32000 B). Amiga uses a hires 2-bitplane copper/framebuffer setup written in a DiagROM-inspired structure; do not reintroduce ad hoc diagnostic branches (`SCREEN_DIAG_STAGE` and friends were deliberately removed) and do not regress `glyph.c` to a single-plane renderer.
 - **Keyboard**: ST polls the IKBD ACIA and filters non-keyboard packets. Amiga polls CIAA with the handshake; `kbd_wait_for_key_press()` must react to *any* key, not only mapped ones.
-- **Memory layout**: constants live in `src/st/mem.h` (with `_Static_assert` guards) and `src/amiga/mem.h`. On Amiga, `startup.s`, `mem.h` and `rom_abs.ld.S` must stay in sync; runtime code executes **from RAM** after boot, so never assume ROM addresses for code except `_platform_hard_reset`.
+- **Memory layout**: constants live in `src/st/mem.h` (with `_Static_assert` guards) and `src/amiga/mem.h`. On Amiga, `startup.s`, `mem.h` and `rom_abs.ld.S` must stay in sync; runtime code executes **from RAM** after boot, so never assume ROM addresses for code.
 - **Text**: `text_printf()` implements cursor movement, erase/clear, save/restore cursor, wrap control, reverse video and foreground colour. `ESC c n`, `ESC e`, `ESC f` are parsed but intentionally not implemented. `text_run_feature_tests()` must stay in the tree even though nothing calls it.
 
 ## Build internals
@@ -193,7 +194,8 @@ Adding a `.c` file: append it to `SRCS_C` in `src/st/Makefile` and/or `src/amiga
 - **Memory constants**: changing anything in `mem.h` means updating the startup asm and `rom_abs.ld.S` together, on both platforms if shared.
 - **Names that must not change**: `rom_check.c/.h` stays as is (it was renamed from `rom_crc` when the algorithm became an additive checksum; do not rename it back). `text_run_feature_tests()` stays in the tree.
 - **ST linker script** is generated into `build/<mode>/rom_abs.ld` through a `.tmp` file and then renamed, so a failed preprocess never leaves a stale script behind. Keep that pattern if you touch the rule.
-- **Amiga reset**: keep the true cold-reset stub in `startup.s` ROM code; nothing in relocated RAM may be relied on after `platform_hard_reset()`.
+- **Amiga reset** (D-10): the reset runs from RAM and relies only on the prefetched `jmp` after `reset`; keep `reset` and `jmp` in one longword and add nothing after them. Nothing in RAM survives the reset, and nothing may read the old ROM between `SELECT_ROM` and the reset.
+- **Amiga frame count**: `platform_frames()` reads bit 8 of the beam line again and retries if it changed, or a tight loop counts line 255 to 256 as a frame (EPIC-05 STORY-01).
 - Naming inside files is mixed (`snake_case` in `common/`, some `camelCase` and `kConstant` enums in `switcher.c`). Match the file you edit; do not reformat wholesale.
 - `build/`, `dist/`, `*.o`, `*.map`, `*.bin` are generated and git-ignored; exclude them from searches.
 

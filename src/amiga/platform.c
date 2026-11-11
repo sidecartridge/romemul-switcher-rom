@@ -8,6 +8,7 @@
 
 #include "../common/nonce.h"
 #include "../common/platform.h"
+#include "../common/trace.h"
 
 #include "hw.h"
 #include "mem.h"
@@ -101,8 +102,17 @@ static unsigned long gFrames = 0UL;
 static unsigned short gLastLine = 0U;
 
 unsigned long platform_frames(void) {
-  const unsigned short line = (unsigned short)(((AMIGA_VPOSR & 1U) << 8) |
-                                               (AMIGA_VHPOSR >> 8));
+  unsigned short high;
+  unsigned short line;
+
+  /* Bit 8 of the line and its low byte come from two registers: read bit 8
+     again and retry if it changed in between. Otherwise line 255 to 256 can
+     read as line 0, a frame that never happened, which a tight loop hits
+     every frame: EPIC-05's one-second wait lasted 0.6 s in FS-UAE. */
+  do {
+    high = (unsigned short)(AMIGA_VPOSR & 1U);
+    line = (unsigned short)((high << 8) | (AMIGA_VHPOSR >> 8));
+  } while ((unsigned short)(AMIGA_VPOSR & 1U) != high);
   if (line < gLastLine) {
     gFrames++;
   }
@@ -112,6 +122,35 @@ unsigned long platform_frames(void) {
 
 unsigned short platform_frame_rate(void) {
   return ((AMIGA_VPOSR & 0x1000U) != 0U) ? 60U : 50U; /* NTSC Agnus: 60 Hz */
+}
+
+/* The reset after a selection (EPIC-05 STORY-01). After SELECT_ROM the
+   firmware serves the old image for about 55 ms, up to about 410 ms, then
+   nothing for 26 to 29 ms, then the new image (C-07). So the screen turns red,
+   the code waits a second of frames from RAM, where the old image cannot
+   reach it, then amiga_cold_reset (reset.s) resets and jumps through offset 2
+   of the new image, without reading the ROM before the reset. More than
+   twice C-07's worst case, and still short at the bench. */
+enum { kResetColour = 0x0F00U, kResetWaitSeconds = 1U };
+
+extern void amiga_cold_reset(void);
+
+void platform_hard_reset(void) {
+  const unsigned short rate = platform_frame_rate();
+  unsigned long wait = 0UL;
+  unsigned long start;
+  unsigned short i;
+
+  AMIGA_COLOR00 = kResetColour;
+  for (i = 0U; i < kResetWaitSeconds; ++i) {
+    wait += rate; /* a sum, not a multiply: a 32-bit multiply needs libgcc */
+  }
+  TRACE("reset wait %lu frames", wait);
+  start = platform_frames();
+  while (platform_frames() - start < wait) {
+  }
+  TRACE("reset now");
+  amiga_cold_reset();
 }
 
 /* The RAM (EPIC-03 STORY-13), found the way DiagROM V2 finds it

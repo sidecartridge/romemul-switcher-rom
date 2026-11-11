@@ -74,10 +74,12 @@ ifeq ($(SCREENSHOT),1)
 SRCS_C += screenshot.c
 endif
 SRCS_S_ROM := startup.s
+# Linked into .ramtext like the C objects: it must run from RAM (EPIC-05).
+SRCS_S_RAM := reset.s
 VPATH := . ../common
 
 OBJS_C := $(SRCS_C:%=$(BUILD_DIR)/%.o)
-OBJS_ROM := $(SRCS_S_ROM:%=$(BUILD_DIR)/%.o) $(OBJS_C)
+OBJS_ROM := $(SRCS_S_ROM:%=$(BUILD_DIR)/%.o) $(SRCS_S_RAM:%=$(BUILD_DIR)/%.o) $(OBJS_C)
 
 
 all: $(TARGET_ROM_BIN)
