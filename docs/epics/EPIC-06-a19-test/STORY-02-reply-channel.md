@@ -2,7 +2,7 @@
 id: STORY-02
 epic: EPIC-06
 title: The reply channel, found from the marker
-status: blocked
+status: todo
 ---
 
 ## Goal
@@ -32,11 +32,10 @@ through `$E00000`. The 512 KB image still does so through `$F80000`.
 
 ## Notes
 
-Blocked on two things (see the epic's notes):
-
-- **The GPIO 25 question.** If the A500 can neither reach `$E00000` nor read SRAM through a
-  pull-down, a staged rescue cannot work there at all, and the firmware must not stage it.
-- **The A500's Gary.** Whether it decodes `$E00000` as ROM is unknown.
+Unblocked 2026-11-11 by Diego's answer on the carriers (see the epic's notes). On a 512 KB
+carrier, GPIO 25 is tied to GND, so every read comes from SRAM and the marker reads low even with
+the half staged. Replies then stay at `$F80000`, and nothing on an A500 or A2000 reads
+`$E00000`.
 
 If A19 is stuck high on a staged board, both addresses read the slot and no channel answers.
 The boot ping then reports "does not answer", and the self-test cannot run. Stuck low reads the

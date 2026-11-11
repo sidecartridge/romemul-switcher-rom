@@ -20,15 +20,15 @@ are exercised before the bench.
 - [ ] Sessions:
   - the 1 MB image with both halves served (A19 `ok`);
   - the 1 MB image with the high marker overwritten (A19 `stuck`);
-  - the 512 KB image (A19 `skipped`).
+  - the 512 KB image on a Gayle model (A19 `skipped`), and on the A500 model (A19 `n/a`).
 
-  All three are added to `all_harness.sh`.
+  All four are added to `all_harness.sh`.
 - [ ] The test build's parameters page carries the "slot holds the rescue half" value that each
   session needs.
 
 ## Acceptance
 
-`all_harness.sh` passes with the three new sessions, and the 25 earlier ones are unchanged.
+`all_harness.sh` passes with the four new sessions, and the 25 earlier ones are unchanged.
 
 ## Notes
 

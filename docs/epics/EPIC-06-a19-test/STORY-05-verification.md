@@ -16,9 +16,9 @@ image still works where it cannot.
   selection that boots (Diego)
 - [ ] RP2350B, A600, a 1 MB default ROM (slot not staged): A19 `skipped`, the list and a
   selection that boots (Diego)
-- [ ] RP2350B, A500 or A2000: the list, the self-test and a selection that boots, with GPIO 25
-  as the carrier wires it (Diego)
-- [ ] RP2350A, A500 or A2000: the same, with A19 `skipped` (Diego)
+- [ ] RP2350B, A500 or A2000 (512 KB carrier, GPIO 25 tied to GND), with the slot staged and
+  without: the list, the self-test with A19 `n/a`, and a selection that boots (Diego)
+- [ ] RP2350A, A500 or A2000: the same, with A19 `n/a` (Diego)
 - [ ] The 30-second soak on the A600 with the slot staged: no error (Diego)
 
 ## Acceptance

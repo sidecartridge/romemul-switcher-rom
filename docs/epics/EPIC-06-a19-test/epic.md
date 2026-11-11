@@ -72,12 +72,14 @@ Open, and blocking STORY-02 and STORY-03:
   the slot. The meaning stays "the slot holds the rescue image's half, yes or no", and the
   host SWITCHER carries the record unchanged. The firmware will send the offset and values
   with its commit hash.
-- **GPIO 25 on the A500 and A2000 carriers.** It is an input with no pull
-  (`tosemul_2350b.pio.h:177-179`), and the firmware asked Diego how the carriers wire it.
-  Unwired or high, a staged rescue would boot an A500 from the slot half. That works only if
-  the A500 can reach the replies at `$E00000`, and nobody has checked whether its Gary
-  decodes that range as ROM. A pull-down on GPIO 25 in the firmware would keep the A500 on
-  SRAM.
+- **GPIO 25 on the carriers: answered.** Diego, 2026-11-11, through the firmware session:
+  the 512 KB carriers (A500, A2000) tie it to GND, and the 1 MB carriers wire it to the
+  computer's A19. GPIO 25 stays an input with no pull (`tosemul_2350b.pio.h:177-179`).
+  - On a 512 KB carrier every read comes from SRAM, even with the rescue half staged.
+  - Replies stay at `$F80000`, and the A500's Gary never has to decode `$E00000`.
+  - The firmware cannot tell the two carriers apart, so a staged half on a 512 KB carrier
+    reads exactly like A19 stuck low on a 1 MB carrier. The ROM has to tell them apart
+    (STORY-03).
 - **Which images v4.0.0 publishes for the Amiga: both.** The firmware session reported this on
   2026-11-11, and it was checked read-only the same day. The usbdrive builder, shared by both
   boards, rejects any rescue above 512 KB and silently falls back to the first catalog ROM of

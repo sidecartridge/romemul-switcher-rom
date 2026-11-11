@@ -10,7 +10,8 @@ status: blocked
 The self-test's address line adds A19 on the Amiga:
 - `ok` when the two halves read their own markers;
 - `stuck` when the slot is staged but both addresses read the same marker;
-- `skipped` when the firmware says the slot does not hold the rescue's upper half.
+- `skipped` when the firmware says the slot does not hold the rescue's upper half;
+- `n/a` on a 512 KB carrier (A500, A2000), which never sees A19.
 
 ## Tasks
 
@@ -18,25 +19,34 @@ The self-test's address line adds A19 on the Amiga:
   lives: a parameters-page word, or a sector after the slot. The offset and values come from the
   firmware session with its commit hash. Mirror them in `src/common/selftest.c` and in
   `src/common/test.c`'s parameters page (D-03).
-- [ ] After A1 to A18 (`selftestAddress()`), read the marker at `$E00000` and at `$F80000`:
+- [ ] Tell a 1 MB carrier from a 512 KB one. GPIO 25 is tied to GND on the 512 KB carriers
+  (A500, A2000), so with the half staged those read the low marker at both addresses: exactly
+  A19 stuck low, as far as the firmware can tell.
+  - Proposed: look for a Gayle (A600, A1200) by its ID register at `$DE1000`, as Kickstart
+    does, before reading `$E00000` at all.
+  - No Gayle: report A19 `n/a` (not on this socket) and never read `$E00000`.
+  - Find out which machines use the 1 MB carriers. If any has no Gayle (an A3000 or an
+    A4000), this test needs another way to recognise them.
+- [ ] On a machine with a 1 MB carrier, after A1 to A18 (`selftestAddress()`), read the marker
+  at `$E00000` and at `$F80000`:
   - the low marker, then the high marker: `ok`;
   - the record says staged and both reads match: `stuck` (low or high);
   - the record says not staged: `skipped`;
   - anything else: `wrong`.
 
   `rom_size` stays 512 KB, so A1 to A18, `rom_check` and the stress reads are unchanged.
-- [ ] The screen says "A1-A19" when A19 passes, and "A1-A18, A19 skipped" otherwise, within 80
-  columns (EPIC-03 STORY-12).
-- [ ] `@@ selftest addr A19 ok|stuck|skipped|wrong` in debug builds, and the harness reads it.
+- [ ] The screen says "A1-A19" when A19 passes, "A1-A18, A19 skipped" when the half is not
+  staged, and "A1-A18" alone on a 512 KB carrier, within 80 columns (EPIC-03 STORY-12).
+- [ ] `@@ selftest addr A19 ok|stuck|skipped|n/a|wrong` in debug builds, and the harness reads it.
 - [ ] A stuck A19 in the harness (`--stuck-line 19` writes the low marker into the high half)
   reports `stuck`.
 
 ## Acceptance
 
 In FS-UAE (STORY-04):
-- the 1 MB image on a machine that maps both halves says A19 `ok`;
+- the 1 MB image on a model with a Gayle that maps both halves says A19 `ok`;
 - with the high marker overwritten, it says `stuck`;
-- the 512 KB image says `skipped`.
+- on the A500 model, both images say `n/a` and never read `$E00000`.
 
 ## Notes
 
