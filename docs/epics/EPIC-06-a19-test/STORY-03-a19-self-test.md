@@ -45,6 +45,12 @@ The self-test's address line adds A19 on the Amiga:
 
   Ask the firmware session for Diego's exact list of machines per carrier.
 
+  The firmware cannot read which carrier it sits on: the RP2350B has no carrier-ID strap (firmware
+  session, 2026-11-11). If the second check fails, the fallback is new firmware work. It would
+  record a sticky "GPIO 25 seen high since boot", which a 1 MB carrier sets with the CPU's first
+  `$F8xxxx` read and a 512 KB carrier never sets, and the ROM would read it from the reply area
+  or the owner record. Not requested. The firmware will raise it only if the check needs it.
+
   `rom_size` stays 512 KB, so A1 to A18, `rom_check` and the stress reads are unchanged.
 - [ ] The screen says "A1-A19" when A19 passes, "A1-A18, A19 skipped" when the half is not
   staged, and "A1-A18" alone when it is `n/a`, within 80 columns (EPIC-03 STORY-12).
