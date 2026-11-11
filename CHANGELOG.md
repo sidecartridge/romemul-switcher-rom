@@ -1,6 +1,6 @@
 # Changelog
 
-## v4.0.0 (2026-10-10, re-issued YYYY-MM-DD)
+## v4.0.0 (2026-10-10, re-issued 2026-11-11)
 
 For the SidecarTridge TOS Emulator and Kickstart Emulator with firmware v4.0.0, on both the RP2350A and RP2350B boards. It talks protocol 0x40 and works with firmware v4.0.0 only.
 
