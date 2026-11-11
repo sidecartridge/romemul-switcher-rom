@@ -2,7 +2,7 @@
 id: STORY-02
 epic: EPIC-07
 title: Merge, move the tag and publish (Diego's step)
-status: in-progress
+status: done
 ---
 
 ## Goal
@@ -16,7 +16,7 @@ D-09).
   `release/v4.0.0` into `main` (Diego)
 - [x] The old tag deleted locally and on GitHub, and `make tag` run on `main`. `release.yml`
   then replaces the release's assets (Diego)
-- [ ] Any asset of the first issue that the second one no longer publishes is removed from the
+- [x] Any asset of the first issue that the second one no longer publishes is removed from the
   release by hand, since `overwrite: true` replaces assets but never deletes them (Diego)
 - [x] The published assets checked:
   - the canonical names and exact sizes;
@@ -44,3 +44,5 @@ here.
   | `RESCUE_SWITCHER_v4.0.0_192KB.img` | 196,608 | `511718fc9121fd9328bfa8f23b402c58c923f6994ad1ab6ee5b3f37a821c8199` | `B6583310` |
   | `RESCUE_SWITCHER_v4.0.0_256KB.img` | 262,144 | `a403ec763a1d11345a50bf18da0bf4569a3311f9c271b2f627437cdae36019ba` | `F67A2CA7` |
   | `RESCUE_SWITCHER_v4.0.0_512KB.img` | 524,288 | `c79d474fe3413671ba50975f730fa3d54a35ab7d44f031793acb0c412cea614c` | `F5F38998` |
+
+**Done 2026-11-11.** Diego deleted the first release's draft himself. The only `v4.0.0` release is the re-issue, with the three images above.
