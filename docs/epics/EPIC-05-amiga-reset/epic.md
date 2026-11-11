@@ -34,9 +34,8 @@ about 2 µs after `SELECT_ROM`, while the old image is still on the bus (C-07).
 From iteration 1's candidates (2026-10-09), where it was "Diego's call" because it contradicts
 `CLAUDE.md`: "keep the true cold-reset stub in `startup.s` ROM code".
 
-This epic comes before EPIC-06 for two reasons. EPIC-06's 1 MB image runs from the board's flash
-slot, where today's ROM-resident stub would run from too. A reset that no longer reads the old
-image removes that dependency before the image layout changes.
+It needs no firmware work, so its place in the order is free. It comes after EPIC-04, whose
+fixes are smaller.
 
 Diego reported selections that boot "several times" on the Amiga (EPIC-03 STORY-15). The race
 has never been seen to fail, so this epic is about margin, and the bench has to show it changes

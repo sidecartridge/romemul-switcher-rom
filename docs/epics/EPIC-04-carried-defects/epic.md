@@ -21,7 +21,7 @@ a real ST.
   - the native-features probe in debug builds.
 - Out of scope:
   - the Amiga reset after a selection (EPIC-05);
-  - the A19 test (EPIC-06);
+  - the ROM size line (EPIC-06);
   - any change to the shared contract.
 
 ## Platforms

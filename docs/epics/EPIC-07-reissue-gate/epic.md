@@ -27,7 +27,7 @@ v4.0.0 (D-09, C-06). This ends iteration 2.
 All published images:
 - `RESCUE_SWITCHER_v4.0.0_192KB.img`;
 - `RESCUE_SWITCHER_v4.0.0_256KB.img`;
-- for the Amiga, `_512KB.img` for the RP2350A and `_1024KB.img` for the RP2350B (EPIC-06).
+- `RESCUE_SWITCHER_v4.0.0_512KB.img`, one image for both boards as before (D-08).
 
 ## Stories
 
