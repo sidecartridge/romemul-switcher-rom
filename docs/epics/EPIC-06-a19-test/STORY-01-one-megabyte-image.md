@@ -24,8 +24,10 @@ half comes first, and the two halves differ only in a marker word.
 - [ ] Each half boots alone. That is what the RP2350A serves, and what the firmware serves when
   it cannot stage the upper half. `rom_check.c` still sums 512 KB at `$F80000`, whichever half
   is there.
-- [ ] `tools/dev/build.sh amiga <type>` and `./build.sh amiga` write the 1 MB image next to, or
-  instead of, the 512 KB one, as decided in the epic's notes.
+- [ ] `tools/dev/build.sh amiga <type>` and `./build.sh amiga` write the 1 MB image next to the
+  512 KB one. The firmware pins the 1 MB image for the RP2350B and the 512 KB one for the
+  RP2350A (see the epic's notes). `release.yml` uploads both.
+- [ ] D-08 amended for the Amiga, once Diego agrees: two images, one per board.
 - [ ] The marker's offset and values are recorded here and in `CLAUDE.md`'s finalisation section.
 - [ ] Reproducibility: a clean build of a commit gives the same 1 MB bytes locally and in CI.
 

@@ -78,10 +78,17 @@ Open, and blocking STORY-02 and STORY-03:
   the A500 can reach the replies at `$E00000`, and nobody has checked whether its Gary
   decodes that range as ROM. A pull-down on GPIO 25 in the firmware would keep the A500 on
   SRAM.
-- **Which images v4.0.0 publishes for the Amiga.** One option is the 1 MB image alone,
-  `RESCUE_SWITCHER_v4.0.0_1024KB.img`, the name the firmware accepted. The other is that
-  image beside today's 512 KB one. That depends on whether the RP2350A firmware accepts a
-  1 MB rescue and serves its first half (D-08: one image per computer for both boards).
+- **Which images v4.0.0 publishes for the Amiga: both.** The firmware session reported this on
+  2026-11-11, and it was checked read-only the same day. The usbdrive builder, shared by both
+  boards, rejects any rescue above 512 KB and silently falls back to the first catalog ROM of
+  512 KB or less (`usbdrive/src/builder.c:1446-1461`). emul on the RP2350A refuses any image
+  above 512 KB with the 300 ms blink and never serves the first half alone
+  (`emul/src/tosemul.c:952`, firmware D-09). Firmware EPIC-17 lifts the cap on the RP2350B only
+  and keeps the 512 KB rescue for the RP2350A. So v4.0.0 publishes
+  `RESCUE_SWITCHER_v4.0.0_1024KB.img` for the RP2350B beside `_512KB.img` for the RP2350A.
+  That breaks D-08's "one image per computer" for the Amiga: a D-08 amendment is proposed, for
+  Diego. Having the RP2350A serve the first half of a 1 MB image instead would be a new firmware
+  decision against firmware D-09, and nobody is proposing it.
 
 Depends on firmware EPIC-17 (option 1 staging and the 512 KB rescue cap lifted on the RP2350B)
 and on the owner record. It comes after EPIC-05, so the 1 MB image carries a reset that does
