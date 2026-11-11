@@ -2,29 +2,27 @@
 id: STORY-02
 epic: EPIC-06
 title: The harness
-status: todo
+status: done
 ---
 
 ## Goal
 
-FS-UAE exercises both answers before the bench.
+FS-UAE checks both answers before the bench.
 
 ## Tasks
 
-- [ ] The A500 sessions say 512 KB. Check what FS-UAE returns at `$E00000` on an A500 with a
-  512 KB Kickstart, and record it.
-- [ ] One session on a model that maps `$E00000` as ROM, an A600 or A1200, with a 1 MB
-  `kickstart_file` made of two copies of the debug-test image. This stands in for the board's
-  mirror. Check how FS-UAE maps a 1 MB Kickstart on that model, and record it. The session
-  says 1 MB.
-- [ ] Both sessions in `all_harness.sh`.
+- [x] Every A500 session expects `@@ selftest buschip Gary id=0x00`.
+- [x] `fsuae_harness.py --model a600` boots the image on FS-UAE's A600, and expects an ECS Agnus
+  (`chip=0x20`) and `@@ selftest buschip Gayle id=0xd0`.
+- [x] The A600 session in `all_harness.sh`, and the whole run passing.
 
 ## Acceptance
 
-`all_harness.sh` passes with the new session. The 25 earlier ones are unchanged, apart from the
-new line.
+`all_harness.sh` passes with the new session.
 
 ## Notes
 
-FS-UAE answers no bus commands (C-03). These sessions check the probe and the screen, not the
-board.
+FS-UAE answers no bus commands (C-03). These sessions check the Gayle reads and the screen.
+
+**Done 2026-11-11.** `all_harness.sh` passed 32 of 32 with 0 key retries, `fsuae-amiga-a600`
+included, its Agnus `0x20` and Denise `0xfc`.

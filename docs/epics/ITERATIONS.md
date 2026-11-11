@@ -7,7 +7,7 @@ done in and why, and how it ends. One iteration per release.
 | Iteration | Theme | Status |
 | --- | --- | --- |
 | 1 | **v4.0.0**: the rescue ROM that ships in firmware v4.0.0's release images, protocol 0x40, exercised in Hatari and FS-UAE and seen on hardware | done 2026-10-10 |
-| 2 | **v4.0.0 re-issued** (D-09): the defects carried over from the first issue, the Amiga reset after a selection, and the ROM size the Amiga supports in the self-test | planned |
+| 2 | **v4.0.0 re-issued** (D-09): the defects carried over from the first issue, the Amiga reset after a selection, and the Amiga's bus chip in the self-test | planned |
 
 ---
 
@@ -107,7 +107,7 @@ and EPIC-00. None is approved yet; each waits for Diego to choose it into an epi
 **Goal:** New images published as `v4.0.0` again, replacing those of `561b13d` (D-09):
 - the defects of the first issue fixed;
 - an Amiga reset that waits for the firmware;
-- a self-test that says whether the Amiga supports a 512 KB or a 1 MB ROM.
+- a self-test that names the Amiga's bus chip, Gary or Gayle.
 
 Exercised in Hatari and FS-UAE before every bench pass, seen on both boards, and re-pinned by
 the firmware's own re-issued v4.0.0. Diego, 2026-11-11: "iteration 2 is going to overwrite
@@ -130,7 +130,7 @@ with Diego's checkpoint.
 | --- | --- | --- |
 | EPIC-04 | The defects carried over from v4.0.0 | First: four small fixes, none waiting on a sibling. Each is one file and a harness session: the error screens that now try again, the catalog walk, the ST keyboard overrun, and a debug image on hardware. |
 | EPIC-05 | The Amiga reset waits for the firmware | C-07's race, the last open candidate of iteration 1. Amiga only, and needs Diego's call on replacing the ROM-stub rule of `CLAUDE.md`. |
-| EPIC-06 | The ROM size the Amiga supports, in the self-test | Asked by Diego through the firmware session, 2026-11-11, first as an A19 test with a 1 MB rescue image. Diego dropped the 1 MB image the same day: the self-test now only shows whether the machine takes a 512 KB or a 1 MB ROM, read from whether `$E00000` holds the rescue image. No change to the shared contract. Needs the re-issued firmware's 512 KB mirror fix to boot on the A600. |
+| EPIC-06 | The Amiga's bus chip, Gary or Gayle, in the self-test | Asked by Diego through the firmware session, 2026-11-11, first as an A19 test with a 1 MB rescue image, then as the ROM size the Amiga takes. Neither can be read from the ROM: Gary mirrors the Kickstart at `$E00000` like a 1 MB machine, and only the socket's A19 wiring differs. Diego settled on naming the bus chip. No change to the shared contract. |
 | EPIC-07 | The v4.0.0 re-issue gate | Last: the notes, the merges, moving the tag, and the firmware's re-pin. |
 
 ### Candidates, not yet epics

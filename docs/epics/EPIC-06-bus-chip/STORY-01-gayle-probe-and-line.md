@@ -1,50 +1,53 @@
 ---
 id: STORY-01
 epic: EPIC-06
-title: The probe and the self-test line
-status: todo
+title: The Gayle check and the self-test line
+status: done
 ---
 
 ## Goal
 
-The Amiga self-test shows a line saying whether the computer supports a 512 KB or a 1 MB
-Kickstart, read from whether `$E00000` holds this image.
+The Amiga self-test shows a "Bus chip" line: "Gayle (ID 0xD0)" on an A600, "Gayle (ID 0xD1)"
+on an A1200, and "Gary (no Gayle ID)" otherwise.
 
 ## Tasks
 
-- [ ] `src/amiga/platform.c`: the probe compares a few fixed words of the image at `$E00000`
-  with the same offsets at `$F80000`. Suitable words are the address-test signatures near the
-  end and the start of the image. A match means 1 MB, any difference 512 KB. It reaches
-  `src/common` through `platform_machine_t` (`src/common/platform.h`) as a ROM size in KB. That
-  size is 0 on the ST and STE, where the line is not shown.
-- [ ] `src/common/selftest.c`: a line next to "Rescue image" (`selftestImage()`, EPIC-03
-  STORY-13), for example "ROM socket ok 1 MB (0xE00000 and 0xF80000)" or "ROM socket ok 512 KB
-  (0xF80000)". It is within 80 columns (EPIC-03 STORY-12). The Amiga's self-test goes from 11
-  lines to 12.
-- [ ] `@@ selftest socket 512|1024` in debug builds. `tools/dev/harness_common.py` expects it on
-  the Amiga.
-- [ ] The `$E00000` reads run under a bus-error handler, and a bus error counts as 512 KB. The
-  ROM owns its vectors, so the guard costs a few instructions. Suggested by the firmware session
-  and agreed by Diego there, 2026-11-11.
-- [ ] Check that reading `$E00000` is harmless on every supported Amiga: an A500 or A2000 with
-  Gary, and an A600. Use the Hardware Reference Manual, then the bench. Record the source here.
-  The firmware session found no document either way, and no Kickstart 1.3 or 3.1 code that reads
-  `$E00000`, so no A500 is known to read it at boot. Gary should answer an unmapped read with
-  DTACK and floating-bus data. With the guard, only a hang remains as a possible failure.
-- [ ] Release payload sizes before and after.
+- [x] `src/amiga/probe.s`: a word read and a byte write under a temporary bus-error handler
+  (`amiga_probe_word`, `amiga_probe_write_byte`), the pattern of the ST's `st_probe_read`.
+  Linked into RAM.
+- [x] `src/amiga/platform.c`: read Gayle's ID at `$DE1000`. A write restarts the ID, then eight
+  reads each give the next bit, most significant first, in bit 7 of the byte (bit 15 of the
+  word), as MAME models it. Read the ID twice, and count only `0xD0` or `0xD1` found both
+  times. It reaches `src/common` as `bus_chip` and `bus_chip_id` in `platform_machine_t`,
+  which are unset on the ST.
+- [x] `src/common/selftest.c`: the "Bus chip" line after the machine line, within 80 columns,
+  and `@@ selftest buschip <Gary|Gayle> id=0x<id>` in debug builds. The Amiga's self-test
+  goes from 11 lines to 12.
+- [x] Release payload sizes before and after.
 
 ## Acceptance
 
-In FS-UAE (STORY-02) the A500 says 512 KB, and a model that maps `$E00000` says 1 MB. On
-hardware: STORY-03.
+In FS-UAE the A500 says Gary and the A600 says Gayle, ID 0xD0. On hardware: STORY-03.
 
 ## Notes
 
-- The words must be ones the image never changes at runtime and a mirror cannot fake. The
-  address-test signatures and the fill pattern qualify. Open bus or another ROM at `$E00000`
-  will not match several of them.
-- The result is right even when the slot holds a 1 MB default ROM's upper half. In rescue mode
-  emul serves the slot only for an image above 512 KB, and it decides from the image it serves
-  (`serve_slot = slot != 0 && rom_flash_size > 512 KB`, `emul/src/tosemul.c:1237`). So the
-  512 KB rescue is served from SRAM on both halves. Re-checked read-only in firmware `3a1bf82`
-  (EPIC-16, on its branch `iteration-2`, not pushed), 2026-11-11.
+- **The ID register**, from MAME (`src/mame/amiga/gayle.cpp`, `gayle_id_r` and `gayle_id_w`;
+  `src/mame/amiga/amiga.cpp`, `GAYLE_ID` `0xd0` for the A600 and `0xd1` for the A1200,
+  mapped at `0xde0000`). A write resets the bit counter. Each read returns
+  `((id << count++) & 0x80) << 8`.
+- **Why twice.** A machine without Gayle returns whatever the bus holds. FS-UAE's A500 gave
+  `0x22`, then `0xFF` once the code around the reads changed. One exact reading could match by
+  chance about 2 times in 256. Two that agree make that about 1 in 32,000, even for a truly
+  random bus.
+- **Is the read safe on a machine without Gayle?** The firmware session believes Kickstart 3.1
+  checks for Gayle on every machine, the A500 included, but neither of us has confirmed it. A
+  bus error counts as "no Gayle" in any case.
+- The `$E00000` comparison and the `--rom-1mb` harness option of the first attempt are gone.
+
+**Done 2026-11-11**, code in `48be4d2` on `epic-06-bus-chip`.
+
+- **FS-UAE.** The A500 reads `0x0ff 0x0ff` and says Gary. The A600 reads `0x0d0 0x0d0` and
+  says Gayle, ID 0xD0.
+- **Release payload,** clean builds: ST/STE 25,812 → 25,952 bytes, Amiga 26,048 → 26,444. The
+  baseline is `127565f`, EPIC-05. The ST grows too, because the self-test's line is in
+  `src/common`, even though the ST never shows it.
