@@ -23,8 +23,14 @@ Kickstart, read from whether `$E00000` holds this image.
   lines to 12.
 - [ ] `@@ selftest socket 512|1024` in debug builds. `tools/dev/harness_common.py` expects it on
   the Amiga.
+- [ ] The `$E00000` reads run under a bus-error handler, and a bus error counts as 512 KB. The
+  ROM owns its vectors, so the guard costs a few instructions. Suggested by the firmware session
+  and agreed by Diego there, 2026-11-11.
 - [ ] Check that reading `$E00000` is harmless on every supported Amiga: an A500 or A2000 with
   Gary, and an A600. Use the Hardware Reference Manual, then the bench. Record the source here.
+  The firmware session found no document either way, and no Kickstart 1.3 or 3.1 code that reads
+  `$E00000`, so no A500 is known to read it at boot. Gary should answer an unmapped read with
+  DTACK and floating-bus data. With the guard, only a hang remains as a possible failure.
 - [ ] Release payload sizes before and after.
 
 ## Acceptance
@@ -39,6 +45,6 @@ hardware: STORY-03.
   will not match several of them.
 - The result is right even when the slot holds a 1 MB default ROM's upper half. In rescue mode
   emul serves the slot only for an image above 512 KB, and it decides from the image it serves
-  (`serve_slot = slot != 0 && rom_flash_size > 512 KB`, `emul/src/tosemul.c:1237`, firmware
-  working tree, uncommitted, checked read-only 2026-11-11). So the 512 KB rescue is served from
-  SRAM on both halves. Re-check the line once the mirror fix (firmware EPIC-16) is committed.
+  (`serve_slot = slot != 0 && rom_flash_size > 512 KB`, `emul/src/tosemul.c:1237`). So the
+  512 KB rescue is served from SRAM on both halves. Re-checked read-only in firmware `3a1bf82`
+  (EPIC-16, on its branch `iteration-2`, not pushed), 2026-11-11.
