@@ -2,7 +2,7 @@
 id: STORY-01
 epic: EPIC-07
 title: Release notes
-status: in-progress
+status: done
 ---
 
 ## Goal
@@ -16,7 +16,7 @@ The top section of `CHANGELOG.md` describes the re-issued v4.0.0: what it fixes 
   per paragraph and list item (`CLAUDE.md`).
 - [x] Name the images and their sizes. Say that the build ID on screen tells the two issues
   apart.
-- [ ] Diego approves the text.
+- [x] Diego approves the text.
 
 ## Acceptance
 
@@ -47,6 +47,9 @@ and A600." So:
   because the setting shipped with firmware v4.0.0.
 
 The A600's need for the re-issued firmware's mirror fix stays out. `README.md` and `CLAUDE.md`
-name the four Amigas too. The ROM's own title still says "Amiga 500/2000"
-(`src/amiga/switcher.c`), pending Diego.
+name the four Amigas too. The ROM's own title now reads "Amiga 16 bit models" (Diego: "The right wording for rescue ROM
+should "Amiga 16 bit models""), in `src/amiga/switcher.c`.
 
+**Done 2026-11-11.** Diego approved with "commit". Committed on `epic-07-reissue-gate`: the
+title, then the notes. The re-issue date in the heading (`YYYY-MM-DD`) is still to be set at
+the tag (STORY-02).
