@@ -2,7 +2,7 @@
 id: EPIC-05
 iteration: 2
 title: The Amiga reset waits for the firmware
-status: todo
+status: in-progress
 ---
 
 ## Goal
@@ -40,3 +40,6 @@ fixes are smaller.
 Diego reported selections that boot "several times" on the Amiga (EPIC-03 STORY-15). The race
 has never been seen to fail, so this epic is about margin, and the bench has to show it changes
 nothing visible.
+
+**Started 2026-11-11** on `epic-05-amiga-reset`, before EPIC-04's bench check (Diego: "go with
+epic 05"). STORY-01 is done in the emulators. The bench check is STORY-02.
