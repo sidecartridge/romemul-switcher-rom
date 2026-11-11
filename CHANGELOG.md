@@ -35,7 +35,9 @@ The firmware's README, "Updating a board", also covers the SWITCHER and `CONFIG.
 - The boot screen shows the version, the image size and the build.
 - New in the re-issue: the Amiga 500+ and the Amiga 600 join the Amiga 500 and 2000, with the same 512 KB image.
 - New in the re-issue: on the Amiga the self-test names the chip that decodes the bus, Gayle on an A600 or A1200, Gary on the other models.
-- Experimental: Kickstart images larger than 512 KB, up to 1 MB, on the RP2350B board with the firmware's `LARGE_ROMS` setting in `CONFIG.TXT`. They can be tested on an Amiga 500+ or 600.
+- Experimental: Kickstart images larger than 512 KB, up to 1 MB, on the RP2350B board with the firmware's `LARGE_ROMS` setting in `CONFIG.TXT` (`LARGE_ROMS = 1`). They can be tested on an Amiga 500+ or 600. An image above 1 MB, or above 512 KB without `LARGE_ROMS`, is refused, and the board serves the rescue ROM instead.
+  - A 1 MB image holds the `$E00000` half first and the `$F80000` half second: the reverse of the merged ROM that Kickstart builders make for burning a 27C800.
+  - Known issue: a 1 MB image chosen from the rescue switcher or the SWITCHER runs with whatever upper half the board last stored, until the board is next connected to a computer over USB. Name the image in `DEFAULT.TXT` instead, or connect the board over USB once after choosing it.
 
 ### Fixed
 
