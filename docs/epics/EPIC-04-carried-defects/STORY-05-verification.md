@@ -28,3 +28,13 @@ All four checked by Diego.
 ## Notes
 
 Debug images are still never put on hardware, even after STORY-04.
+
+- 2026-11-11, the images of `f5cb491` (ST `dbc7479f…`, STE `9a84e72d…`), on Diego's Mega ST,
+  which has a 256 KB ROM decoder, so it runs both images. Diego: "ST and STE works. 192KB and
+  256KB work."
+  - The firmware session loaded them onto the RP2350B (firmware `da87d2e+debug`). The board's
+    `rom-check` matched the 256 KB image, and the board counted 345,233 reads and 258 commands
+    with no error. Only the start-up path was exercised there.
+  - No task is checked yet. Still to confirm: the RP2350A, the STE, the self-test, the soak, a
+    selection, quick keys and an error screen.
+
