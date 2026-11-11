@@ -37,7 +37,7 @@ KEY_TIMEOUT = 4.0
 def fsuae_config(image, serial, run_dir, args):
     lines = [
         "[fs-uae]",
-        "amiga_model = A500",
+        f"amiga_model = {args.model.upper()}",
         f"kickstart_file = {image}",
         f"chip_memory = {args.chip}",  # 512 KB and nothing else by default (D-07)
         f"slow_memory = {args.slow}",
@@ -77,6 +77,12 @@ def main():
                         help="make address line AN read as stuck across the stress region")
     parser.add_argument("--soak", action="store_true",
                         help="also run the 30-second soak from the self-test screen")
+    parser.add_argument("--exit", choices=sorted(hc.EXITS),
+                        help="change the built-in data so the chooser ends on that "
+                             "screen: a key must start it again")
+    parser.add_argument("--model", choices=["a500", "a600"], default="a500",
+                        help="the Amiga model: an A600 has a Gayle, which the "
+                             "self-test must name (EPIC-06)")
     parser.add_argument("--no-warp", action="store_true",
                         help="run at the A500's own speed")
     parser.add_argument("--interactive", action="store_true",
@@ -88,7 +94,7 @@ def main():
         fsuae = hc.emulator_path("fsuae")
     except hc.HarnessError as err:
         hc.die(str(err))
-    label = "fsuae-amiga-a500" + ("-corrupt" if args.corrupt else "") + \
+    label = f"fsuae-amiga-{args.model}" + ("-corrupt" if args.corrupt else "") + \
         (f"-chip{args.chip}" if args.chip != 512 else "") + \
         (f"-slow{args.slow}" if args.slow else "") + \
         (f"-stuck-a{args.stuck_line}" if args.stuck_line else "") + \
@@ -96,6 +102,7 @@ def main():
         (f"-stress-d{args.stress_fault}" if args.stress_fault is not None else "") + \
         (f"-stress-a{args.stress_alias}" if args.stress_alias is not None else "") + \
         ("-soak" if args.soak else "") + \
+        (f"-exit-{args.exit}" if args.exit else "") + \
         ("-nowarp" if args.no_warp else "") + ("-interactive" if args.interactive else "")
     run_dir = hc.new_run_dir(label)
     if args.corrupt:
@@ -113,6 +120,8 @@ def main():
     if args.stress_alias is not None:
         image = hc.stress_alias_copy(image, os.path.join(run_dir, "stress-alias.img"),
                                      "amiga", args.stress_alias)
+    if args.exit:
+        image = hc.exit_copy(image, os.path.join(run_dir, "exit.img"), "amiga", args.exit)
 
     # The serial port: a pseudo-terminal in raw mode before FS-UAE opens it, or
     # a key byte waits for a newline (sidecartos-config EPIC-00 STORY-04).
@@ -162,11 +171,15 @@ def main():
 
     error = None
     try:
-        hc.run_session(trace, press, shot, steps, "amiga", args.corrupt,
-                       stuck_line=args.stuck_line, stuck_data=args.stuck_data,
-                       stress_fault=args.stress_fault, soak=args.soak,
-                       stress_alias=args.stress_alias,
-                       machine="amiga", ram=(args.chip, args.slow))
+        if args.exit:
+            hc.run_exit_session(trace, press, shot, steps, "amiga", args.exit)
+        else:
+            hc.run_session(trace, press, shot, steps, "amiga", args.corrupt,
+                           stuck_line=args.stuck_line, stuck_data=args.stuck_data,
+                           stress_fault=args.stress_fault, soak=args.soak,
+                           stress_alias=args.stress_alias,
+                           machine="amiga", ram=(args.chip, args.slow),
+                           model=args.model)
     except (hc.HarnessError, OSError) as err:
         error = str(err)
     finally:

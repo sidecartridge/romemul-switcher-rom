@@ -229,6 +229,8 @@ void platform_probe_machine(platform_machine_t *out) {
   }
   out->chip_id = 0U;
   out->denise_id = 0U;
+  out->bus_chip = (const char *)0; /* an Amiga line only (EPIC-06) */
+  out->bus_chip_id = 0U;
 
   /* The line the ROM reads once at power-on to pick mono or colour; a change
      here would explain a cold boot in the wrong mode. */

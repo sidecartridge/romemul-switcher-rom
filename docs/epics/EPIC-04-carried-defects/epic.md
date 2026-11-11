@@ -2,7 +2,7 @@
 id: EPIC-04
 iteration: 2
 title: The defects carried over from v4.0.0
-status: todo
+status: done
 ---
 
 ## Goal
@@ -31,7 +31,7 @@ only. The verification covers both boards on an ST or Mega ST, an STE and an Ami
 
 ## Stories
 
-- STORY-01: Every exit screen leads somewhere
+- STORY-01: Error screens that try again
 - STORY-02: A bounded catalog walk
 - STORY-03: The ST keyboard keeps its keys
 - STORY-04: A debug image that does not trap on hardware
@@ -44,3 +44,11 @@ reset race (EPIC-05). Diego, 2026-11-11: "write the epics and stories for the ne
 
 They come first because none of them waits for a sibling repository. They are also small: each
 is one file and one harness session.
+
+**Started 2026-11-11** on `epic-04-carried-defects`, cut from a new `release/v4.0.0` at `b2cbaa8`
+(`main`). Diego: "ok, start". The uncommitted screenshot build of 2026-10-11 rode along in the
+working tree. STORY-01 to STORY-04 were built and run the same day, uncommitted. `all_harness.sh`
+passed 31 of 31 with 0 key retries. Open: Diego's choice for STORY-01, the timed poll gap of
+STORY-03, and the bench (STORY-05).
+
+**Done 2026-11-11.** Diego's bench check passed with the release images of `f5cb491` (see the verification story). The code reaches `release/v4.0.0` through EPIC-07.

@@ -22,7 +22,6 @@
 
 .equ CIAA_PRA,  0x00BFE001
 .equ CIAA_DDRA, 0x00BFE201
-.equ COLOR00,   0x00DFF180
 
 .text
     reset
@@ -70,11 +69,5 @@ _amiga_boot:
 6:
     jmp     _rom_switcher_main
 
-    .balign 4
-    .globl _platform_hard_reset
-_platform_hard_reset:
-    move.w  #0x0F00, COLOR00
-    move.w  #0x2700, %sr
-    lea     2, %a0
-    reset
-    jmp     (%a0)
+/* The reset after a selection runs from RAM since EPIC-05 STORY-01:
+   platform_hard_reset() in platform.c and amiga_cold_reset in reset.s. */

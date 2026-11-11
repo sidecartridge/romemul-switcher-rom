@@ -29,7 +29,8 @@ enum {
   kRomCompressedClusterSize = 184,
   kDefaultRomIndex = 70,
   kRescueRomIndex = 256 + kDefaultRomIndex,
-  kElementsPerPage = 17
+  kElementsPerPage = 17,
+  kErasedFlashByte = 0xFF
 };
 
 #define ENDIAN_BIG 1
@@ -71,9 +72,14 @@ static int parse_rom_description(const unsigned char *rom_desc_raw,
   text_printf("Rescue ROM index: %lu\n\r", rescue_rom_index);
 #endif
 
+  /* Bounded by the records the catalog buffer holds, and ended by erased
+     flash (0xFF) as by a zero byte (EPIC-04 STORY-02, as sidecartos-config
+     448fd03): a catalog never written must not walk past the buffer. */
+  const int max_records = (int)(MEMORY_EXCHANGE_SIZE / kRomDescriptionSize);
   int count = 0;
   int scan_offset = 0;
-  while (rom_desc_raw[scan_offset] != 0U) {
+  while (count < max_records && rom_desc_raw[scan_offset] != 0U &&
+         rom_desc_raw[scan_offset] != kErasedFlashByte) {
     count++;
     scan_offset += kRomDescriptionSize;
   }
@@ -389,6 +395,14 @@ static int display_paginated_content(char *file_array, int num_files,
   return -1;
 }
 
+/* Every screen that ends the chooser: the caller starts again from the
+   checksum after the key (EPIC-04 STORY-01). */
+static void wait_to_try_again(void) {
+  text_printf("Press any key to try again...\r\n");
+  TRACE("waitkey");
+  kbd_wait_for_key_press();
+}
+
 void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
                   unsigned char default_color, const char *computer_model) {
   char titleLine[SCR_WIDTH_CHARS + 1U];
@@ -401,6 +415,8 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
   if (!buffer) {
     text_printf("Out of memory for the %lu-byte ROM catalog buffer.\r\n",
                 (unsigned long)MEMORY_EXCHANGE_SIZE);
+    TRACE("out of memory");
+    wait_to_try_again();
     return;
   }
 
@@ -409,6 +425,8 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
   if (!buffer_params) {
     text_printf("Out of memory for the %lu-byte ROM parameters buffer.\r\n",
                 (unsigned long)MEMORY_PARAMS_EXCHANGE_SIZE);
+    TRACE("out of memory");
+    wait_to_try_again();
     return;
   }
 
@@ -455,9 +473,10 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
 #else
   int err = read_flash_page(buffer_params, FLASH_PARAMS_START, ENDIAN_BIG);
   if (err != 0) {
-    text_printf("Error reading the flash page at address %08lx. Exiting.\r\n",
+    text_printf("Error reading the flash page at address %08lx.\r\n",
                 (unsigned long)FLASH_PARAMS_START);
-    kbd_wait_for_key_press();
+    TRACE("flash read error %08lx", (unsigned long)FLASH_PARAMS_START);
+    wait_to_try_again();
     return;
   }
 
@@ -468,9 +487,10 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
                         (unsigned long)i * (unsigned long)READ_ROM_PAGE_SIZE);
     err = read_flash_page(buffer + i * READ_ROM_PAGE_SIZE, addr, ENDIAN_BIG);
     if (err != 0) {
-      text_printf("Error reading the flash page at address %08lx. Exiting.\r\n",
+      text_printf("Error reading the flash page at address %08lx.\r\n",
                   (unsigned long)addr);
-      kbd_wait_for_key_press();
+      TRACE("flash read error %08lx", (unsigned long)addr);
+      wait_to_try_again();
       return;
     }
   }
@@ -489,10 +509,8 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
     text_printf(
         "This rescue switcher is not compatible with the device's "
         "firmware.\r\n");
-    text_printf("Press any key to exit...\r\n");
     TRACE("protocol mismatch");
-    TRACE("waitkey");
-    kbd_wait_for_key_press();
+    wait_to_try_again();
     return;
   }
 
@@ -521,10 +539,8 @@ void chooser_loop(unsigned long rom_base_addr, helper_trace_fn_t trace_fn,
     if (num_entries == 0) {
       text_printf(
           "No ROMs found. Do you have a Sidecartrige device configured?\r\n");
-      text_printf("Press any key to exit...\r\n");
       TRACE("no roms");
-      TRACE("waitkey");
-      kbd_wait_for_key_press();
+      wait_to_try_again();
       return;
     } else {
       rom_number = display_paginated_content(
