@@ -7,6 +7,9 @@
  */
 
 #include "../common/kbd.h"
+#if defined(_SCREENSHOT) && (_SCREENSHOT > 0)
+#include "../common/screenshot.h"
+#endif
 
 enum {
   kAciaBaseAddr = 0x00FFFC00UL,
@@ -14,11 +17,13 @@ enum {
   kIkbdAciaCtrlPolling = 0x16U,
   kIkbdStatusRxFull = 0x01U,
   kIkbdStatusTxEmpty = 0x02U,
-  kIkbdStatusErrMask = 0x70U,
+  /* Framing and parity errors: the byte is bad. An overrun (0x20) only says
+     that a byte before this one was lost: this one is valid (EPIC-04
+     STORY-03). */
+  kIkbdStatusBadByteMask = 0x50U,
   kIkbdCmdTurnMouseOff = 0x12U,
   kInvalidScancode = 0xFFU,
   kKeyReleaseMask = 0x80U,
-  kPollDelayLoops = 2500U,
   kPacketHeaderMouseRelativeMin = 0xF8U,
   kPacketHeaderMouseRelativeMax = 0xFBU,
   kPacketHeaderMouseAbsolute = 0xF7U,
@@ -76,13 +81,10 @@ static void kbdAciaInit(void) {
   kbdAciaInitialized = 1U;
 }
 
-static void kbdDelay(unsigned long loops) {
-  while (loops--) {
-    __asm__ volatile("nop\n nop\n" ::: "memory");
-  }
-}
-
 unsigned char kbd_poll_scancode(void) {
+#if defined(_SCREENSHOT) && (_SCREENSHOT > 0)
+  return kInvalidScancode; /* the key script stands in for the keyboard */
+#endif
   kbdAciaInit();
 
   for (;;) {
@@ -99,7 +101,7 @@ unsigned char kbd_poll_scancode(void) {
     }
 
     data = ST_IKBD_ACIA.data;
-    if (status & kIkbdStatusErrMask) {
+    if (status & kIkbdStatusBadByteMask) {
       continue;
     }
 
@@ -143,10 +145,14 @@ unsigned char kbd_poll_scancode(void) {
 }
 
 unsigned char kbd_poll_scancode_wait(void) {
+#if defined(_SCREENSHOT) && (_SCREENSHOT > 0)
+  return screenshot_key();
+#endif
   for (;;) {
     unsigned char scan = kbd_poll_scancode();
     if (scan == kInvalidScancode) {
-      kbdDelay(kPollDelayLoops);
+      /* No delay between polls: the IKBD sends a byte every 1.28 ms and the
+         ACIA holds one, so a 28 ms gap could lose one (EPIC-04 STORY-03). */
       continue;
     }
     if (scan & kKeyReleaseMask) {

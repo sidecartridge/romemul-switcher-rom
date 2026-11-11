@@ -4,15 +4,21 @@
 # toolchain image, and finalize it (EPIC-00 STORY-01). Modelled on
 # sidecartos-config's tools/dev/build.sh.
 #
-# Usage: tools/dev/build.sh <st|ste|amiga> <release|debug|test|debug-test>
+# Usage: tools/dev/build.sh <st|ste|amiga> <release|debug|test|debug-test|screenshot>
 #
 # Output goes to tools/dev/builds/<platform>-<type>/ (git-ignored): the
 # finalized image under its published name, the ST/STE program, the link maps,
 # and the objects under obj/. build/ and dist/ are never touched.
+#
+# screenshot: the release code with a cartridge that always answers and a key
+# script (src/common/screenshot.c), for the user documentation's captures in
+# Hatari and FS-UAE. It shows the build ID of the release tagged v<version>,
+# as the published images do, and is named SCREENSHOT_v<ver>_<size>KB.img so
+# it is not taken for one of them. Never for hardware.
 set -euo pipefail
 
 usage() {
-  echo "usage: $0 <st|ste|amiga> <release|debug|test|debug-test>" >&2
+  echo "usage: $0 <st|ste|amiga> <release|debug|test|debug-test|screenshot>" >&2
   exit 2
 }
 [[ $# -eq 2 ]] || usage
@@ -20,10 +26,11 @@ platform=$1
 type=$2
 
 case "$type" in
-  release) debug=0 test=0 ;;
-  debug) debug=1 test=0 ;;
-  test) debug=0 test=1 ;;
-  debug-test) debug=1 test=1 ;;
+  release) debug=0 test=0 screenshot=0 ;;
+  debug) debug=1 test=0 screenshot=0 ;;
+  test) debug=0 test=1 screenshot=0 ;;
+  debug-test) debug=1 test=1 screenshot=0 ;;
+  screenshot) debug=0 test=0 screenshot=1 ;;
   *) usage ;;
 esac
 
@@ -41,10 +48,15 @@ source "$here/toolchain.sh"
 
 version="$(tr -d '\r\n' < version.txt | sed 's/^[vV]//')"
 build_id="$(rescue_build_id "$repo" "$type")"
+prefix=RESCUE_SWITCHER
+if [[ "$screenshot" == 1 ]]; then
+  build_id="$(git -C "$repo" rev-parse --short=7 "v$version^{commit}")"
+  prefix=SCREENSHOT
+fi
 out="tools/dev/builds/$platform-$type"   # relative to the repository root
 echo "build id: $build_id"
 
-make_args="DEBUG=$debug TEST=$test ROM_BASE_ADDR_UL=$base BUILD_ID=$build_id BUILD_DIR=/work/$out/obj"
+make_args="DEBUG=$debug TEST=$test SCREENSHOT=$screenshot ROM_BASE_ADDR_UL=$base BUILD_ID=$build_id BUILD_DIR=/work/$out/obj"
 [[ -n "$startup" ]] && make_args+=" STARTUP_ROM_ASM=$startup"
 
 # The folder is emptied inside the container, on the same side of Docker's
@@ -54,7 +66,7 @@ docker run --rm --platform linux/x86_64 -v "$repo:/work" -w /work \
   -c "rm -rf ./$out && mkdir -p ./$out/obj && make -s -C src/$subdir $make_args"
 
 raw="$out/obj/RESCUE_SWITCHER_v$version.img"
-image="$out/RESCUE_SWITCHER_v${version}_${size}KB.img"
+image="$out/${prefix}_v${version}_${size}KB.img"
 map=-
 if [[ "$platform" == "amiga" ]]; then
   map="$out/obj/ROMSWAMI.MAP"

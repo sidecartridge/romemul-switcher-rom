@@ -922,6 +922,18 @@ static void selftestMachine(selftest_ctx_t *ctx) {
                    (machine.monitor_changes == 0U) ? "stable" : "changing",
                    (unsigned int)machine.monitor_samples);
   }
+  /* The chip that decodes the bus (EPIC-06): Amiga only. */
+  if (machine.bus_chip != (const char *)0) {
+    TRACE("selftest buschip %s id=0x%02x", machine.bus_chip,
+          (unsigned int)machine.bus_chip_id);
+    if (machine.bus_chip_id != 0U) {
+      selftestReport(ctx, "Bus chip", kResultOk, "%s (ID 0x%02x)",
+                     machine.bus_chip, (unsigned int)machine.bus_chip_id);
+    } else {
+      selftestReport(ctx, "Bus chip", kResultOk, "%s (no Gayle ID)",
+                     machine.bus_chip);
+    }
+  }
 }
 
 /* The image itself (STORY-13): its size is the ROM window the machine model

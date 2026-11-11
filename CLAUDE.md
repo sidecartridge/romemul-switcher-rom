@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-The **bare-metal rescue ROM switcher** for the **SidecarTridge ROM Emulator** family (TOS Emulator and Kickstart Emulator). It is a ROM image that the cartridge's Pico firmware (`../sidecartos`) boots *instead of* the system ROM when the device is in **Rescue Mode**. It runs on the retro computer (Atari ST/Mega ST, Atari STE/Mega STE, Amiga 500/2000), lists the ROM images stored in the cartridge's flash, lets the user pick one, tells the firmware to make it the boot ROM, and hard-resets the machine.
+The **bare-metal rescue ROM switcher** for the **SidecarTridge ROM Emulator** family (TOS Emulator and Kickstart Emulator). It is a ROM image that the cartridge's Pico firmware (`../sidecartos`) boots *instead of* the system ROM when the device is in **Rescue Mode**. It runs on the retro computer (Atari ST/Mega ST, Atari STE/Mega STE, Amiga 500, 500+, 600 and 2000), lists the ROM images stored in the cartridge's flash, lets the user pick one, tells the firmware to make it the boot ROM, and hard-resets the machine.
 
 It is **fully freestanding**: no TOS, GEMDOS, BIOS, XBIOS, Kickstart or AmigaOS calls anywhere in the runtime; no libc; `LIBS`/`LDLIBS` must stay empty (the Makefiles error out otherwise). All platform code talks to the hardware registers directly with interrupts masked and everything polled.
 
@@ -17,7 +17,7 @@ Sibling repos (same protocol, different roles):
 
 `sidecartos`, `sidecartos-config` and this repo form one product. **Any change to what they share must land in all three, coordinated, never in one alone.** The shared contract is:
 
-- the protocol version (`kSwitcherTosProtocolVersion` here, `SWITCHER_TOS_PROTOCOL_VERSION` in `usbdrive/src/include/constants.h` and `sidecartos-config/src/include/helper.h`), plus the copy in `src/common/test.c` byte 512;
+- the protocol version (`kSwitcherTosProtocolVersion` here, `SWITCHER_TOS_PROTOCOL_VERSION` in `usbdrive/src/include/constants.h` and `sidecartos-config/src/include/helper.h`), plus the copies in `src/common/test.c` byte 512 and `src/common/screenshot.c`;
 - the flash offsets (`FLASH_CATALOG_START`, `FLASH_PARAMS_START`) and the firmware linker scripts behind them;
 - `parameters_t` and `rom_catalog_t` from the firmware's `usbdrive/src/include/builder.h` (this repo hard-codes byte offsets 70, 256+70 and 512);
 - the bus protocol: magic-sequence offsets, nonce and checksum masks, command codes in the firmware's `emul/src/include/tosemul.h`, the Hamming encoding of `CMD_SELECT_ROM`, and the reply layout;
@@ -33,7 +33,7 @@ How to keep them in sync:
 
 Facts the siblings rely on that are easy to break here:
 
-- The firmware zero-fills the whole 60 KB catalog after the last record and caps it at 64 records (`ROM_MAX_FILES`). `parse_rom_description()` relies on that: it walks records until one starts with a zero byte, with no upper bound.
+- The firmware writes one empty record after the last one and caps the catalog at 64 records (`ROM_MAX_FILES`). Since firmware `da87d2e` (its EPIC-08) it erases only the sectors those records use, so the records after the empty one may be old data. `parse_rom_description()` stops at a record starting with `0x00` or `0xFF`, or after 240 records (EPIC-04 STORY-02). Keep that stop wherever the catalog is walked: never read past the empty record.
 - `blocks` is a u32 at record byte 64. This ROM reads only its low 16 bits, which is enough up to 65535 blocks.
 - Parameters-page bytes 516 to 532 hold the `CONFIG.TXT` words that only the host switcher reads. Bytes 536 to 767 may hold stray data on a device.
 - The firmware rejects a rescue ROM above 512 KB. Debug firmware holds at most 496 KB in SRAM (firmware D-16), so test the 512 KB Amiga image with release firmware.
@@ -44,7 +44,7 @@ One source tree produces **three ROM images**, selected by `ROM_BASE_ADDR_UL` (n
 |---|---|---|---|---|
 | `st` | `0x00FC0000UL` | `src/st/startup_st.s` | `RESCUE_SWITCHER_v<ver>_192KB.img` | Atari ST / Mega ST (192 KB TOS slot) |
 | `ste` | `0x00E00000UL` | `src/st/startup_ste.s` | `RESCUE_SWITCHER_v<ver>_256KB.img` | Atari STE / Mega STE (256 KB TOS slot) |
-| `amiga` | `0x00F80000UL` | `src/amiga/startup.s` | `RESCUE_SWITCHER_v<ver>_512KB.img` | Amiga 500/2000, full 512 KB Kickstart-replacement ROM |
+| `amiga` | `0x00F80000UL` | `src/amiga/startup.s` | `RESCUE_SWITCHER_v<ver>_512KB.img` | Amiga 500, 500+, 600 and 2000, full 512 KB Kickstart-replacement ROM |
 
 `st` and `ste` share `src/st/`; `src/st/switcher.c` derives the displayed model name from `ROM_BASE_ADDR_UL` (`0x00FC0000UL` → "Atari ST", `0x00E00000UL` → "Atari STE"). The ST build also emits a `ROMSWITC.PRG` (linked via `start.s`) that runs the same code as a TOS program for quick testing in Hatari. `start.s` is the **only** place allowed to touch the OS: it calls GEMDOS `Super(0)` when not already in supervisor mode, then never returns to TOS.
 
@@ -54,13 +54,13 @@ One source tree produces **three ROM images**, selected by `ROM_BASE_ADDR_UL` (n
 
 ```bash
 tools/dev/build.sh st release      # out of tree into tools/dev/builds/st-release/; never touches dist/
-tools/dev/build.sh ste debug-test  # types: release | debug | test | debug-test; platforms: st | ste | amiga
+tools/dev/build.sh ste debug-test  # types: release | debug | test | debug-test | screenshot; platforms: st | ste | amiga
 ./build.sh st                      # release build, published to dist/st/ (st | ste | amiga | all)
 ./build.sh all                     # replaces dist/, so tell the firmware first (C-06)
 tools/dev/romtool.sh info <img>    # the pinned romtool (amitools 0.8.1), repo-relative paths
-tools/dev/all_harness.sh           # build all release and debug-test images, run 25 sessions (~5 min)
-python3 tools/dev/hatari_harness.py --image ste --machine megaste   # one session; also --monitor mono, --memsize KB, --corrupt, --stuck-line N, --stuck-data K
-python3 tools/dev/fsuae_harness.py # the Amiga session over the serial port; also --chip KB, --slow KB, --corrupt, --stuck-line N, --stuck-data K, --no-warp
+tools/dev/all_harness.sh           # build all release and debug-test images, run 32 sessions (~5 min)
+python3 tools/dev/hatari_harness.py --image ste --machine megaste   # one session; also --monitor mono, --memsize KB, --corrupt, --stuck-line N, --stuck-data K, --exit mismatch|empty|erased
+python3 tools/dev/fsuae_harness.py # the Amiga session over the serial port; also --chip KB, --slow KB, --corrupt, --stuck-line N, --stuck-data K, --exit mismatch|empty|erased, --model a600, --no-warp
 tools/dev/measure_builds.sh        # payload and free space of every image, as a Markdown table
 make clean                         # removes build/st* and build/amiga* (outputs of a direct make)
 make format-check                  # clang-format dry run over src/**/*.{c,h}
@@ -102,7 +102,9 @@ File map, for orientation:
 | `st/platform.c` | magic-sequence inline asm per ROM base, hard reset |
 | `st/natfeat.s`, `st/htrace.c` | Hatari NatFeats trace (`_DEBUG` only) |
 | `st/mem.h`, `st/rom_abs.ld.S` | RAM layout with `_Static_assert` guards; ROM linker script template |
-| `amiga/startup.s` | ROM bootstrap: overlay off, code/`.data` copy to RAM, `.bss` clear, ROM-resident `_platform_hard_reset` |
+| `amiga/startup.s` | ROM bootstrap: overlay off, code/`.data` copy to RAM, `.bss` clear |
+| `amiga/probe.s` | `amiga_probe_word` / `amiga_probe_write_byte` under a bus-error handler, for the Gayle check (EPIC-06) |
+| `amiga/reset.s` | `amiga_cold_reset`: `reset` and `jmp` through offset 2, run from RAM (EPIC-05) |
 | `amiga/screen.c` | hires 2-bitplane display and framebuffer, DiagROM-inspired structure |
 | `amiga/kbd.c` | CIAA keyboard polling and handshake |
 | `amiga/glyph.c` | bitplane-aware glyph renderer |
@@ -118,7 +120,7 @@ The firmware cannot be addressed as a device: the host can only *read* ROM. Comm
 - **Reply channel**: the firmware overwrites the first bytes of the emulated ROM. Base+0 echoes the nonce when the command completed (`0xFFFFFFFD` = checksum error); base+4 is where block data, checksum and status appear (`kReadRomBlockSize` 512 B + checksum word). `send_sync_rom_command` spins on base+0 with a retry budget, calling `platform_poll()` each iteration.
 - **Commands used here** (`commands.c` enum): `kCmdSelectRom 0x0000`, `kCmdUnlockReadBlockMemory 0x0008`, `kCmdLockReadBlockMemory 0x000A`. The parameter is always shifted left one bit (addresses must be even); `kCmdSelectRom` additionally **Hamming-encodes** the ROM index (`hamming_encode`). The host-side tool has many more commands (write, erase, rename…); this ROM is read-only by design.
 - **Flash reads**: `read_flash_block` (512 B, verified against the remote checksum, `kMaxCommandRetries` 16) and `read_flash_page` (4 KB = 8 blocks; the `endian` flag word-swaps because the Pico stores little-endian). Flash **offsets** are relative to the Pico's `XIP_BASE`: `FLASH_CATALOG_START 0xFF0000`, `FLASH_PARAMS_START 0xFFF000` (`chooser.c`). They **must match the firmware's linker scripts**.
-- **Selecting a ROM** = `send_change_rom_command_and_hard_reset(index)`: one async `kCmdSelectRom` then `platform_hard_reset()`. **`SELECT_ROM` is never echoed**: the firmware leaves its command loop, `write_rom_list()` erases and rewrites the parameters page, then `watchdog_reboot()`, and the ROM is off the bus for about 26 to 29 ms until the emulator is up again. On ST the reset path masks interrupts, busy-waits about 2.9 s at 8 MHz (covering that gap), clears the three memvalid magics (`0x420`, `0x43A`, `0x51A`) so TOS does a cold start, and jumps through the reset vector at address 4. On Amiga the stub lives in ROM `.boot` because RAM code is gone after reset; it runs with **no delay**, which is an open issue (C-07, and the candidates in `docs/epics/ITERATIONS.md`).
+- **Selecting a ROM** = `send_change_rom_command_and_hard_reset(index)`: one async `kCmdSelectRom` then `platform_hard_reset()`. **`SELECT_ROM` is never echoed**: the firmware leaves its command loop, `write_rom_list()` erases and rewrites the parameters page, then `watchdog_reboot()`, and the ROM is off the bus for about 26 to 29 ms until the emulator is up again. On ST the reset path masks interrupts, busy-waits about 2.9 s at 8 MHz (covering that gap), clears the three memvalid magics (`0x420`, `0x43A`, `0x51A`) so TOS does a cold start, and jumps through the reset vector at address 4. On Amiga (EPIC-05, D-10) `platform_hard_reset()` turns the screen red and waits one second of frames from RAM, where the old image cannot reach it, then `amiga_cold_reset` (`src/amiga/reset.s`, linked into RAM) runs Commodore's cold reboot: `reset` and `jmp (a0)` to offset 2 in one longword, so the 68000 has fetched the jump before the overlay maps ROM over that RAM. Nothing reads the old image after `SELECT_ROM`; `scripts/finalize_rom.py` refuses an image where the pair is not longword-aligned.
 
 ## Catalog and parameters
 
@@ -141,7 +143,7 @@ Platform-facing interfaces are `glyph.h`, `kbd.h`, `platform.h`, `term.h`; `src/
 
 - **Display**: ST uses the shifter directly (screen memory at `ST_SCREEN_BASE_ADDR`, 32000 B). Amiga uses a hires 2-bitplane copper/framebuffer setup written in a DiagROM-inspired structure; do not reintroduce ad hoc diagnostic branches (`SCREEN_DIAG_STAGE` and friends were deliberately removed) and do not regress `glyph.c` to a single-plane renderer.
 - **Keyboard**: ST polls the IKBD ACIA and filters non-keyboard packets. Amiga polls CIAA with the handshake; `kbd_wait_for_key_press()` must react to *any* key, not only mapped ones.
-- **Memory layout**: constants live in `src/st/mem.h` (with `_Static_assert` guards) and `src/amiga/mem.h`. On Amiga, `startup.s`, `mem.h` and `rom_abs.ld.S` must stay in sync; runtime code executes **from RAM** after boot, so never assume ROM addresses for code except `_platform_hard_reset`.
+- **Memory layout**: constants live in `src/st/mem.h` (with `_Static_assert` guards) and `src/amiga/mem.h`. On Amiga, `startup.s`, `mem.h` and `rom_abs.ld.S` must stay in sync; runtime code executes **from RAM** after boot, so never assume ROM addresses for code.
 - **Text**: `text_printf()` implements cursor movement, erase/clear, save/restore cursor, wrap control, reverse video and foreground colour. `ESC c n`, `ESC e`, `ESC f` are parsed but intentionally not implemented. `text_run_feature_tests()` must stay in the tree even though nothing calls it.
 
 ## Build internals
@@ -159,6 +161,7 @@ Internal 8.3 names are enforced: `ROMSWITC.PRG/.BIN/.MAP` (release), `ROMSWDBG.*
 | default | `-O2` | real hardware path |
 | `debug` | `-O0 -g -D_DEBUG=1` | Hatari NatFeats tracing on ST (`htrace.c`), extra `text_printf` diagnostics |
 | `test` | `-D_TEST=1 -DTEST=1` | catalog/params reads come from `src/common/test.c` arrays instead of the bus. The arrays are `const`, which this a.out toolchain puts in `test.c.o`'s `.text`, and both `rom_abs.ld.S` route that file to a `.romdata` section in ROM, so the RAM layout matches a release build. The embedded params carry the protocol version at byte 512, so bump it together with `kSwitcherTosProtocolVersion` |
+| `screenshot` | `-O2 -D_SCREENSHOT=1` | the release code for the user documentation's captures in Hatari and FS-UAE (`src/common/screenshot.c`): `command_ping()` and `read_flash_page()` answer as a v4.0.0 board would, with a realistic ROM list per image, and the keyboard is a fixed script of keys, each sent once a screen has waited 5 s. It shows the build ID of the `v<version>` tag and is named `SCREENSHOT_v<ver>_<size>KB.img`. Never for hardware, like debug images. The release images built from the same tree must not change: check them against the release assets with the tag's build ID |
 
 **Image finalisation** (`scripts/finalize_rom.py`, run in the romtool container): pad to the exact size (192/256/512 KB) with a **computed pattern**, never zeros: the word at each even offset is `fill_word(offset)`, which the self-test's stress reads recompute (EPIC-03 STORY-11); then write the self-test's words and the 32-bit big-endian additive checksum. ST/STE: field at `size-4`. Amiga: payload must end before the **kickety-split** marker at `0x40000` (checked against `__rom_payload_end` in the map), the pattern on both sides of it, checksum field at `0x7FFE4` excluding the 4-byte Kickstart checksum at `0x7FFE8`, then `romtool copy -c` fixes the footer and `romtool info` validates. Published artifacts use only canonical names (`RSWIT192.PRG`, `RSWIT256.PRG`, `RESCUE_SWITCHER_v<ver>_<size>KB.img`); do not reintroduce timestamped copies.
 
@@ -192,7 +195,8 @@ Adding a `.c` file: append it to `SRCS_C` in `src/st/Makefile` and/or `src/amiga
 - **Memory constants**: changing anything in `mem.h` means updating the startup asm and `rom_abs.ld.S` together, on both platforms if shared.
 - **Names that must not change**: `rom_check.c/.h` stays as is (it was renamed from `rom_crc` when the algorithm became an additive checksum; do not rename it back). `text_run_feature_tests()` stays in the tree.
 - **ST linker script** is generated into `build/<mode>/rom_abs.ld` through a `.tmp` file and then renamed, so a failed preprocess never leaves a stale script behind. Keep that pattern if you touch the rule.
-- **Amiga reset**: keep the true cold-reset stub in `startup.s` ROM code; nothing in relocated RAM may be relied on after `platform_hard_reset()`.
+- **Amiga reset** (D-10): the reset runs from RAM and relies only on the prefetched `jmp` after `reset`; keep `reset` and `jmp` in one longword and add nothing after them. Nothing in RAM survives the reset, and nothing may read the old ROM between `SELECT_ROM` and the reset.
+- **Amiga frame count**: `platform_frames()` reads bit 8 of the beam line again and retries if it changed, or a tight loop counts line 255 to 256 as a frame (EPIC-05 STORY-01).
 - Naming inside files is mixed (`snake_case` in `common/`, some `camelCase` and `kConstant` enums in `switcher.c`). Match the file you edit; do not reformat wholesale.
 - `build/`, `dist/`, `*.o`, `*.map`, `*.bin` are generated and git-ignored; exclude them from searches.
 

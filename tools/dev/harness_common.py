@@ -64,8 +64,9 @@ def image_path(platform):
     return path
 
 
-def expectations():
-    """What the debug+test build must show, read from the sources it was built from."""
+def test_arrays():
+    """The catalog and parameters page the debug+test build carries, as bytes,
+    read from src/common/test.c."""
     with open(os.path.join(REPO, "src", "common", "test.c"), encoding="utf-8") as handle:
         src = handle.read()
 
@@ -75,8 +76,12 @@ def expectations():
             raise HarnessError(f"flash{name}Raw not found in src/common/test.c")
         return bytes(int(x, 16) for x in re.findall(r"0x([0-9A-Fa-f]{2})", match.group(1)))
 
-    catalog = array("Catalog")
-    params = array("Params")
+    return array("Catalog"), array("Params")
+
+
+def expectations():
+    """What the debug+test build must show, read from the sources it was built from."""
+    catalog, params = test_arrays()
     count = 0
     while count * 256 < len(catalog) and catalog[count * 256] != 0:
         count += 1
@@ -218,7 +223,8 @@ DEFAULT_RAM = (512, 0)
 
 
 def selftest_lines(platform, stuck_line=None, stuck_data=None, machine=None,
-                   screen=None, stress_fault=None, stress_alias=None, ram=DEFAULT_RAM):
+                   screen=None, stress_fault=None, stress_alias=None, ram=DEFAULT_RAM,
+                   model="a500"):
     """The trace lines the self-test (EPIC-03) must print between its start and
     end lines, in order, as (step name, pattern). Each test story adds its own.
     ram: the two parts the RAM probe must find, in KB (STORY-13)."""
@@ -253,9 +259,14 @@ def selftest_lines(platform, stuck_line=None, stuck_data=None, machine=None,
     if machine == "amiga":
         # FS-UAE's A500: an OCS Agnus, PAL (ID 0x00), or an ECS one (0x20) when
         # it is given more than the 512 KB of chip RAM an OCS Agnus can address.
-        agnus = 0x00 if ram[0] <= 512 else 0x20
+        # The A600 has an ECS Agnus whatever its chip RAM.
+        agnus = 0x00 if ram[0] <= 512 and model == "a500" else 0x20
         lines.append((f"machine amiga, Agnus 0x{agnus:02x}",
                       rf"@@ selftest machine amiga chip=0x{agnus:02x} denise=0x[0-9a-f]{{2}}\n"))
+        # The chip that decodes the bus (EPIC-06): the A600's Gayle answers
+        # with its ID, 0xD0; the A500 has a Gary.
+        chip = "Gayle id=0xd0" if model == "a600" else "Gary id=0x00"
+        lines.append((f"bus chip {chip}", rf"@@ selftest buschip {chip}\n"))
     elif machine is not None:
         lines.append((f"machine {machine}",
                       rf"@@ selftest machine {machine} chip=0x00 denise=0x00\n"))
@@ -347,6 +358,79 @@ def stress_fault_copy(src, dst, platform, k):
     return dst
 
 
+# The ways out of the chooser a test build can reach (EPIC-04 STORY-01,
+# STORY-02): what the copy changes in the built-in data, and the trace line of
+# the screen that then waits for a key.
+EXITS = {
+    "mismatch": "protocol mismatch",  # the protocol word one higher
+    "empty": "no roms",               # record 0 starts with 0x00
+    "erased": "no roms",              # record 0 starts with 0xFF, as erased flash
+}
+
+
+def exit_copy(src, dst, platform, kind):
+    """A copy whose built-in parameters page or catalog leads to one of EXITS.
+    The arrays sit in ROM as they are in src/common/test.c; our checksum, and
+    on the Amiga the Kickstart one, are recomputed."""
+    p = finalize_rom.PLATFORMS[platform]
+    catalog, params = test_arrays()
+    with open(src, "rb") as handle:
+        image = bytearray(handle.read())
+
+    def find(blob, name):
+        at = image.find(blob)
+        if at < 0 or image.find(blob, at + 1) >= 0:
+            raise HarnessError(f"the built-in {name} is not in the image exactly once")
+        return at
+
+    if kind == "mismatch":
+        at = find(params, "parameters page") + 512
+        image[at] = (image[at] + 1) & 0xFF
+    else:
+        at = find(catalog[:1024], "catalog")
+        image[at] = 0x00 if kind == "empty" else 0xFF
+    finalize_rom.write_check_field(image, p)
+    with open(dst, "wb") as handle:
+        handle.write(image)
+    if platform == "amiga":
+        fix_kickstart_checksum(dst)
+    return dst
+
+
+def run_exit_session(trace, press, shot, steps, platform, kind):
+    """A screen that ends the chooser waits for a key, and the key starts again
+    from the checksum, which ends on the same screen (EPIC-04 STORY-01)."""
+    exp = expectations()
+    ver = re.escape(exp["version"])
+    reason = re.escape(EXITS[kind])
+
+    def need(name, pattern, timeout=8):
+        if not trace.wait_for(pattern, timeout):
+            path = shot(f"fail-{name.replace(' ', '-')}")
+            steps.fail(name, f"no {pattern!r} in the trace"
+                       + (f"; screenshot {path}" if path else ""))
+        steps.ok(name)
+
+    need("boot", rf"@@ rescue v{ver} \S+ {platform}\n", 90)
+    need("romcheck ok", r"@@ romcheck ok ", 90)
+    need("boot ping no answer", r"@@ bootping noanswer\n")
+    if kind == "mismatch":
+        need("protocol one higher", rf"@@ protocol 0x{exp['protocol'] + 1:04x}\n")
+    else:
+        need("no entries", r"@@ list 0 entries ")
+    need(f"{EXITS[kind]}, waiting", rf"@@ {reason}\n@@ waitkey\n")
+    shot(kind)
+    press("any", r"@@ restart\n")
+    need("romcheck ok again", r"@@ romcheck ok ", 90)
+    need(f"{EXITS[kind]} again", rf"@@ {reason}\n@@ waitkey\n", 30)
+    if re.search(rb"@@ rescue v", trace.data[trace.pos:]):
+        steps.fail("no reboot", "the restart rebooted the image")
+    overflow = re.search(rb"@@ overflow row \d+\n", trace.data)
+    if overflow:
+        steps.fail("80 columns", f"text ran past column 80: {overflow.group().decode().strip()}")
+    steps.ok("80 columns")
+
+
 def stuck_line_copy(src, dst, platform, n):
     """A copy where address line An reads as stuck: its partner word holds the
     reference's signature. Our checksum, and on the Amiga the Kickstart one,
@@ -366,7 +450,7 @@ def stuck_line_copy(src, dst, platform, n):
 
 def run_session(trace, press, shot, steps, platform, corrupt, screen=None,
                 stuck_line=None, stuck_data=None, machine=None, stress_fault=None,
-                soak=False, stress_alias=None, ram=DEFAULT_RAM):
+                soak=False, stress_alias=None, ram=DEFAULT_RAM, model="a500"):
     """The scripted session, the same on every emulator (EPIC-00 STORY-03, STORY-04).
 
     press(key, expect, consume) sends one key ("down", "up", "left", "right",
@@ -414,7 +498,7 @@ def run_session(trace, press, shot, steps, platform, corrupt, screen=None,
     start = trace.pos
     for name, pattern in selftest_lines(platform, stuck_line, stuck_data,
                                         machine, screen, stress_fault, stress_alias,
-                                        ram):
+                                        ram, model):
         need(f"self-test {name}", pattern, 60)
     # The ping, the reliability count and the flash reads are skipped in a
     # test build; only the injected fault, if any, fails.
@@ -469,6 +553,9 @@ def run_session(trace, press, shot, steps, platform, corrupt, screen=None,
     need("confirm entry 1", rf"@@ confirm 1 {re.escape(names[1])}\n@@ waitkey\n")
     press("any", rf"@@ select 1 {re.escape(names[1])}\n")
     need("reset", r"@@ reset rom 1\n")
+    if platform == "amiga":
+        # A second of frames, from RAM, before the reset (EPIC-05 STORY-01).
+        need("reset waits a second", r"@@ reset wait (50|60) frames\n@@ reset now\n")
     need("boot after reset", rf"@@ rescue v{ver} \S+ {platform}\n", 90)
     # No text ran past column 80 on any screen (EPIC-03 STORY-12).
     overflow = re.search(rb"@@ overflow row \d+\n", trace.data)

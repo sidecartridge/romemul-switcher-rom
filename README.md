@@ -17,7 +17,7 @@ Kickstart, or AmigaOS. All platform code talks directly to the hardware.
 1. Download the ROM image that matches your computer model and ROM size:
    - Atari ST/ Mega ST: `192 KB`
    - Atari STE / Mega STE: `256 KB`
-   - Amiga 500/2000: `512 KB`
+   - Amiga 500, 500+, 600 and 2000: `512 KB`
    - Latest releases: <https://github.com/sidecartridge/romemul-switcher-rom/releases>
 2. Copy the downloaded `.img` file into the `ROMEMUL` folder of the device.
 3. Write that image's name in `RESCUE.TXT`, for example `RESCUE_SWITCHER_v4.0.0_192KB.img`.
@@ -59,7 +59,7 @@ guide](https://docs.sidecartridge.com/sidecartridge-kickstart/user-guide/#rescue
 - Shared chooser, ROM protocol, allocator, and text rendering in `src/common/`
 - Shared full-ROM checksum verification in `src/common/rom_check.c`
 - Atari ST/STE hardware-specific code in `src/st/`
-- Amiga 500/2000 hardware-specific code in `src/amiga/`
+- Amiga 500, 500+, 600 and 2000 hardware-specific code in `src/amiga/`
 - Direct hardware keyboard handling on both platforms
 - `80`-column menu on Amiga using hires `2`-bitplane display (`4` colors)
 - Toolchain lives in Docker: the pinned [`atarist-toolkit-docker`](https://github.com/sidecartridge/atarist-toolkit-docker)
@@ -78,7 +78,7 @@ romemul-switcher-rom/
 ├── docs/epics/            # backlog: iterations, epics, stories, decisions
 ├── scripts/               # finalize_rom.py, clang-checks.sh
 ├── src/
-│   ├── amiga/             # Amiga 500/2000 platform code
+│   ├── amiga/             # Amiga 500, 500+, 600 and 2000 platform code
 │   ├── common/            # shared chooser/text/protocol code
 │   └── st/                # Atari ST/STE platform code
 ├── tools/dev/             # out-of-tree builds and pinned toolchain images

@@ -8,6 +8,7 @@
 
 #include "../common/nonce.h"
 #include "../common/platform.h"
+#include "../common/trace.h"
 
 #include "hw.h"
 #include "mem.h"
@@ -101,8 +102,17 @@ static unsigned long gFrames = 0UL;
 static unsigned short gLastLine = 0U;
 
 unsigned long platform_frames(void) {
-  const unsigned short line = (unsigned short)(((AMIGA_VPOSR & 1U) << 8) |
-                                               (AMIGA_VHPOSR >> 8));
+  unsigned short high;
+  unsigned short line;
+
+  /* Bit 8 of the line and its low byte come from two registers: read bit 8
+     again and retry if it changed in between. Otherwise line 255 to 256 can
+     read as line 0, a frame that never happened, which a tight loop hits
+     every frame: EPIC-05's one-second wait lasted 0.6 s in FS-UAE. */
+  do {
+    high = (unsigned short)(AMIGA_VPOSR & 1U);
+    line = (unsigned short)((high << 8) | (AMIGA_VHPOSR >> 8));
+  } while ((unsigned short)(AMIGA_VPOSR & 1U) != high);
   if (line < gLastLine) {
     gFrames++;
   }
@@ -112,6 +122,35 @@ unsigned long platform_frames(void) {
 
 unsigned short platform_frame_rate(void) {
   return ((AMIGA_VPOSR & 0x1000U) != 0U) ? 60U : 50U; /* NTSC Agnus: 60 Hz */
+}
+
+/* The reset after a selection (EPIC-05 STORY-01). After SELECT_ROM the
+   firmware serves the old image for about 55 ms, up to about 410 ms, then
+   nothing for 26 to 29 ms, then the new image (C-07). So the screen turns red,
+   the code waits a second of frames from RAM, where the old image cannot
+   reach it, then amiga_cold_reset (reset.s) resets and jumps through offset 2
+   of the new image, without reading the ROM before the reset. More than
+   twice C-07's worst case, and still short at the bench. */
+enum { kResetColour = 0x0F00U, kResetWaitSeconds = 1U };
+
+extern void amiga_cold_reset(void);
+
+void platform_hard_reset(void) {
+  const unsigned short rate = platform_frame_rate();
+  unsigned long wait = 0UL;
+  unsigned long start;
+  unsigned short i;
+
+  AMIGA_COLOR00 = kResetColour;
+  for (i = 0U; i < kResetWaitSeconds; ++i) {
+    wait += rate; /* a sum, not a multiply: a 32-bit multiply needs libgcc */
+  }
+  TRACE("reset wait %lu frames", wait);
+  start = platform_frames();
+  while (platform_frames() - start < wait) {
+  }
+  TRACE("reset now");
+  amiga_cold_reset();
 }
 
 /* The RAM (EPIC-03 STORY-13), found the way DiagROM V2 finds it
@@ -192,8 +231,67 @@ void platform_probe_memory(platform_memory_t *out) {
   out->part_name[1] = "slow";
 }
 
+/* The chip that decodes the bus (EPIC-06 STORY-01): Gayle on the A600 and
+   A1200, Gary on the A500, A500+, A2000 and CDTV. Whether the machine takes a
+   1 MB Kickstart cannot be read from the ROM: Gary decodes $E00000 as ROM
+   too, and only the socket's A19 wiring differs, which the board's mirror
+   hides. Gayle's ID register, as MAME models it (src/mame/amiga/gayle.cpp):
+   a write to $DE1000 restarts the ID, then each read there returns its next
+   bit, most significant first, in bit 7 of the byte (bit 15 of the word).
+   The write and the reads run under a bus-error handler (probe.s). A machine
+   without Gayle returns whatever the bus holds (FS-UAE's A500 gave 0x22, then
+   0xFF after a change to the code around the reads), so
+   the ID is read twice, each time from a fresh write, and only an exact
+   Gayle ID read both times counts. */
+extern long amiga_probe_word(unsigned long address);
+extern long amiga_probe_write_byte(unsigned long address, unsigned long value);
+
+enum {
+  kGayleIdAddress = 0x00DE1000UL,
+  kGayleIdBits = 8U,
+  kGayleIdBit = 0x8000U,
+  kGayleIdA600 = 0xD0U,
+  kGayleIdA1200 = 0xD1U,
+  kGayleIdFault = 0x100U
+};
+
+/* One reading of the ID register, or 0x100 on a bus error. */
+static unsigned short amigaGayleIdRead(void) {
+  unsigned short id = 0U;
+  unsigned short i;
+
+  if (amiga_probe_write_byte(kGayleIdAddress, 0UL) < 0L) {
+    return kGayleIdFault;
+  }
+  for (i = 0U; i < kGayleIdBits; ++i) {
+    const long word = amiga_probe_word(kGayleIdAddress);
+
+    if (word < 0L) {
+      return kGayleIdFault;
+    }
+    id = (unsigned short)((id << 1) |
+                          ((((unsigned long)word & kGayleIdBit) != 0UL) ? 1U : 0U));
+  }
+  return id;
+}
+
+/* Gayle's ID, or 0 when no Gayle answered. */
+static unsigned short amigaGayleId(void) {
+  const unsigned short first = amigaGayleIdRead();
+  const unsigned short second = amigaGayleIdRead();
+
+  TRACE("gayle id reads %03x %03x", (unsigned int)first, (unsigned int)second);
+  if (first != second) {
+    return 0U;
+  }
+  return (first == kGayleIdA600 || first == kGayleIdA1200) ? first : 0U;
+}
+
 void platform_probe_machine(platform_machine_t *out) {
   const unsigned short agnus = (unsigned short)((AMIGA_VPOSR >> 8) & 0x7FU);
+
+  out->bus_chip_id = amigaGayleId();
+  out->bus_chip = (out->bus_chip_id != 0U) ? "Gayle" : "Gary";
 
   out->name = "amiga";
   out->label = "Amiga";

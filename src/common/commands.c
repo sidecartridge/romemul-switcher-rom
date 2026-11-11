@@ -9,6 +9,9 @@
 #include "commands.h"
 
 #include "platform.h"
+#if defined(_SCREENSHOT) && (_SCREENSHOT > 0)
+#include "screenshot.h"
+#endif
 
 enum {
   kRomInRamSwapOffset = 0x4,
@@ -238,6 +241,9 @@ static int restore_first_long(void) {
 }
 
 int command_ping(void) {
+#if defined(_SCREENSHOT) && (_SCREENSHOT > 0)
+  return 0; /* the screenshot build's cartridge always answers */
+#endif
   /* The firmware answers by writing the nonce at base+0 (cmd_ping()) and
      restores nothing, so put the image's word back whatever the answer. */
   const int answer = send_sync_rom_command(0, kCmdPing, kPingTimeout);
@@ -351,6 +357,11 @@ unsigned long command_block_retries(void) { return block_retries; }
 
 int read_flash_page(void *memory_exchange, unsigned long flash_address_offset,
                     unsigned char endian) {
+#if defined(_SCREENSHOT) && (_SCREENSHOT > 0)
+  (void)endian; /* the page comes as the swap leaves it */
+  return screenshot_read_flash_page((unsigned char *)memory_exchange,
+                                    flash_address_offset);
+#endif
   // A page is kReadRomPageSize composed of kReadRomBlockSize.
   trace_msg("[romswdbg] helper: read_flash_page begin\n");
   for (unsigned short i = 0; i < kReadBlocksPerPage; i++) {

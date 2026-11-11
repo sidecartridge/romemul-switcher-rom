@@ -216,6 +216,11 @@ def finalize_amiga(raw, map_path, out, cmd):
     if len(raw) != p["size"]:
         fail(f"amiga image is {len(raw)} bytes, expected {p['size']}")
     payload_end = map_symbol(map_path, "__rom_payload_end")
+    # The cold reset's reset and jmp share a longword (src/amiga/reset.s,
+    # EPIC-05 STORY-01): the jmp must be fetched before the reset.
+    pair = map_symbol(map_path, "_amiga_cold_reset_pair")
+    if pair % 4 != 0:
+        fail(f"reset and jmp of amiga_cold_reset are not in one longword ({pair:#x})")
     kickety_end = p["kickety"] + p["kickety_size"]
     if payload_end > p["kickety"]:
         fail("Amiga payload overlaps the kickety split area")
