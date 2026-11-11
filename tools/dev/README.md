@@ -7,7 +7,7 @@ sidecartos-config's `tools/dev/`.
 ## Builds
 
 ```bash
-tools/dev/build.sh <st|ste|amiga> <release|debug|test|debug-test>
+tools/dev/build.sh <st|ste|amiga> <release|debug|test|debug-test|screenshot>
 ```
 
 - The output goes to `tools/dev/builds/<platform>-<type>/`: the finalized
@@ -25,6 +25,13 @@ tools/dev/build.sh <st|ste|amiga> <release|debug|test|debug-test>
   `tools/dev/romtool.sh info tools/dev/builds/amiga-release/RESCUE_SWITCHER_v4.0.0_512KB.img`.
 - `measure_builds.sh` builds every platform as release and debug-test and prints the payload
   and free space of each, as a Markdown table.
+- `screenshot` is the release code with a cartridge that always answers and a fixed key script
+  (`src/common/screenshot.c`), for the user documentation's captures in Hatari and FS-UAE. It
+  lists ROMs a v4.0.0 board would hold, shows the build ID of the release tagged
+  `v<version>`, and is named `SCREENSHOT_v<ver>_<size>KB.img` so it is not taken for a
+  published image. Every screen that waits for a key is held 5 s: the list, RETURN to the
+  confirmation, ESC, the list, T to the self-test, S to the soak once the self-test is done,
+  ESC once the soak is done; the list then stays. Never for hardware.
 
 ## Harnesses
 

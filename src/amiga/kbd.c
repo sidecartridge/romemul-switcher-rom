@@ -7,6 +7,9 @@
  */
 
 #include "../common/kbd.h"
+#if defined(_SCREENSHOT) && (_SCREENSHOT > 0)
+#include "../common/screenshot.h"
+#endif
 #include "hw.h"
 
 enum {
@@ -180,6 +183,10 @@ unsigned char kbd_poll_scancode(void) {
   unsigned char key_down;
   unsigned char logical;
 
+#if defined(_SCREENSHOT) && (_SCREENSHOT > 0)
+  return kInvalidScancode; /* the key script stands in for the keyboard */
+#endif
+
 #if defined(_DEBUG) && (_DEBUG > 0)
   {
     unsigned char byte;
@@ -205,6 +212,9 @@ unsigned char kbd_poll_scancode(void) {
 }
 
 unsigned char kbd_poll_scancode_wait(void) {
+#if defined(_SCREENSHOT) && (_SCREENSHOT > 0)
+  return screenshot_key();
+#endif
   for (;;) {
     const unsigned char scan = kbd_poll_scancode();
     if (scan == kInvalidScancode) {
@@ -219,6 +229,10 @@ unsigned char kbd_poll_scancode_wait(void) {
 }
 
 void kbd_wait_for_key_press(void) {
+#if defined(_SCREENSHOT) && (_SCREENSHOT > 0)
+  (void)screenshot_key();
+  return;
+#endif
   for (;;) {
     unsigned char raw_code;
     unsigned char key_down;
@@ -243,6 +257,9 @@ void kbd_wait_for_key_press(void) {
 }
 
 unsigned char kbd_wait_for_key_or_esc(void) {
+#if defined(_SCREENSHOT) && (_SCREENSHOT > 0)
+  return (screenshot_key() == KEY_ESC) ? KEY_ESC : 0U;
+#endif
   for (;;) {
     unsigned char raw_code;
     unsigned char key_down;

@@ -1,5 +1,6 @@
 DEBUG ?= 0
 TEST ?= 0
+SCREENSHOT ?= 0
 # Set by tools/dev/build.sh (EPIC-00 STORY-01); shown on the checksum screen.
 BUILD_ID ?= unknown
 ROM_BASE_ADDR_LD := $(patsubst %UL,%,$(patsubst %ul,%,$(ROM_BASE_ADDR_UL)))
@@ -40,6 +41,15 @@ else
 TEST_DEFS :=
 endif
 
+# The screenshot build (tools/dev/build.sh <platform> screenshot): a release
+# build with a cartridge that always answers and a key script, for the user
+# documentation's captures in Hatari and FS-UAE.
+ifeq ($(SCREENSHOT),1)
+SCREENSHOT_DEFS := -D_SCREENSHOT=1
+else
+SCREENSHOT_DEFS :=
+endif
+
 TARGET_MAP := $(BUILD_DIR)/$(TARGET_BASE).MAP
 ROM_LDSCRIPT := $(BUILD_DIR)/rom_abs.ld
 BUILD_CONFIG_STAMP := $(BUILD_DIR)/.build_config
@@ -52,13 +62,16 @@ ROM_IMAGE_NAME := RESCUE_SWITCHER_v$(APP_VERSION).img
 TARGET_ROM_BIN := $(BUILD_DIR)/$(ROM_IMAGE_NAME)
 NO_EXT_LIB_FLAGS := -nostdlib -nodefaultlibs -nostartfiles
 
-CFLAGS := -m68000 -std=gnu99 -ffreestanding -fomit-frame-pointer $(OPT_FLAGS) -Wall -Wextra -Werror $(NO_EXT_LIB_FLAGS) $(DEBUG_DEFS) $(TEST_DEFS) -DAPP_VERSION_STR=\"$(APP_VERSION)\" -DBUILD_ID_STR=\"$(BUILD_ID)\" -DROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL) -MMD -MP
+CFLAGS := -m68000 -std=gnu99 -ffreestanding -fomit-frame-pointer $(OPT_FLAGS) -Wall -Wextra -Werror $(NO_EXT_LIB_FLAGS) $(DEBUG_DEFS) $(TEST_DEFS) $(SCREENSHOT_DEFS) -DAPP_VERSION_STR=\"$(APP_VERSION)\" -DBUILD_ID_STR=\"$(BUILD_ID)\" -DROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL) -MMD -MP
 ASFLAGS := -m68000 -x assembler-with-cpp $(NO_EXT_LIB_FLAGS) $(DEBUG_DEFS) $(TEST_DEFS) -DROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL) -MMD -MP
 LDFLAGS_ROM := $(NO_EXT_LIB_FLAGS) -Wl,-Map=$(TARGET_MAP),-T,$(ROM_LDSCRIPT),--oformat,binary
 
 SRCS_C := switcher.c text.c screen.c kbd.c glyph.c platform.c palloc.c commands.c chooser.c rom_check.c trace.c nonce.c selftest.c
 ifeq ($(TEST),1)
 SRCS_C += test.c
+endif
+ifeq ($(SCREENSHOT),1)
+SRCS_C += screenshot.c
 endif
 SRCS_S_ROM := startup.s
 VPATH := . ../common
@@ -74,7 +87,7 @@ rom: $(TARGET_ROM_BIN)
 FORCE:
 
 $(BUILD_CONFIG_STAMP): FORCE | $(BUILD_DIR)
-	@printf '%s\n' "ROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL) DEBUG=$(DEBUG) TEST=$(TEST) APP_VERSION=$(APP_VERSION) BUILD_ID=$(BUILD_ID)" > $@.tmp
+	@printf '%s\n' "ROM_BASE_ADDR_UL=$(ROM_BASE_ADDR_UL) DEBUG=$(DEBUG) TEST=$(TEST) SCREENSHOT=$(SCREENSHOT) APP_VERSION=$(APP_VERSION) BUILD_ID=$(BUILD_ID)" > $@.tmp
 	@if [ ! -f $@ ] || ! cmp -s $@.tmp $@; then mv $@.tmp $@; else rm -f $@.tmp; fi
 
 $(BUILD_DIR)/%.c.o: %.c $(BUILD_CONFIG_STAMP) | $(BUILD_DIR)

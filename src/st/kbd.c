@@ -7,6 +7,9 @@
  */
 
 #include "../common/kbd.h"
+#if defined(_SCREENSHOT) && (_SCREENSHOT > 0)
+#include "../common/screenshot.h"
+#endif
 
 enum {
   kAciaBaseAddr = 0x00FFFC00UL,
@@ -83,6 +86,9 @@ static void kbdDelay(unsigned long loops) {
 }
 
 unsigned char kbd_poll_scancode(void) {
+#if defined(_SCREENSHOT) && (_SCREENSHOT > 0)
+  return kInvalidScancode; /* the key script stands in for the keyboard */
+#endif
   kbdAciaInit();
 
   for (;;) {
@@ -143,6 +149,9 @@ unsigned char kbd_poll_scancode(void) {
 }
 
 unsigned char kbd_poll_scancode_wait(void) {
+#if defined(_SCREENSHOT) && (_SCREENSHOT > 0)
+  return screenshot_key();
+#endif
   for (;;) {
     unsigned char scan = kbd_poll_scancode();
     if (scan == kInvalidScancode) {

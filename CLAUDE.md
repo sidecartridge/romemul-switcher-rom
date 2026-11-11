@@ -17,7 +17,7 @@ Sibling repos (same protocol, different roles):
 
 `sidecartos`, `sidecartos-config` and this repo form one product. **Any change to what they share must land in all three, coordinated, never in one alone.** The shared contract is:
 
-- the protocol version (`kSwitcherTosProtocolVersion` here, `SWITCHER_TOS_PROTOCOL_VERSION` in `usbdrive/src/include/constants.h` and `sidecartos-config/src/include/helper.h`), plus the copy in `src/common/test.c` byte 512;
+- the protocol version (`kSwitcherTosProtocolVersion` here, `SWITCHER_TOS_PROTOCOL_VERSION` in `usbdrive/src/include/constants.h` and `sidecartos-config/src/include/helper.h`), plus the copies in `src/common/test.c` byte 512 and `src/common/screenshot.c`;
 - the flash offsets (`FLASH_CATALOG_START`, `FLASH_PARAMS_START`) and the firmware linker scripts behind them;
 - `parameters_t` and `rom_catalog_t` from the firmware's `usbdrive/src/include/builder.h` (this repo hard-codes byte offsets 70, 256+70 and 512);
 - the bus protocol: magic-sequence offsets, nonce and checksum masks, command codes in the firmware's `emul/src/include/tosemul.h`, the Hamming encoding of `CMD_SELECT_ROM`, and the reply layout;
@@ -54,7 +54,7 @@ One source tree produces **three ROM images**, selected by `ROM_BASE_ADDR_UL` (n
 
 ```bash
 tools/dev/build.sh st release      # out of tree into tools/dev/builds/st-release/; never touches dist/
-tools/dev/build.sh ste debug-test  # types: release | debug | test | debug-test; platforms: st | ste | amiga
+tools/dev/build.sh ste debug-test  # types: release | debug | test | debug-test | screenshot; platforms: st | ste | amiga
 ./build.sh st                      # release build, published to dist/st/ (st | ste | amiga | all)
 ./build.sh all                     # replaces dist/, so tell the firmware first (C-06)
 tools/dev/romtool.sh info <img>    # the pinned romtool (amitools 0.8.1), repo-relative paths
@@ -159,6 +159,7 @@ Internal 8.3 names are enforced: `ROMSWITC.PRG/.BIN/.MAP` (release), `ROMSWDBG.*
 | default | `-O2` | real hardware path |
 | `debug` | `-O0 -g -D_DEBUG=1` | Hatari NatFeats tracing on ST (`htrace.c`), extra `text_printf` diagnostics |
 | `test` | `-D_TEST=1 -DTEST=1` | catalog/params reads come from `src/common/test.c` arrays instead of the bus. The arrays are `const`, which this a.out toolchain puts in `test.c.o`'s `.text`, and both `rom_abs.ld.S` route that file to a `.romdata` section in ROM, so the RAM layout matches a release build. The embedded params carry the protocol version at byte 512, so bump it together with `kSwitcherTosProtocolVersion` |
+| `screenshot` | `-O2 -D_SCREENSHOT=1` | the release code for the user documentation's captures in Hatari and FS-UAE (`src/common/screenshot.c`): `command_ping()` and `read_flash_page()` answer as a v4.0.0 board would, with a realistic ROM list per image, and the keyboard is a fixed script of keys, each sent once a screen has waited 5 s. It shows the build ID of the `v<version>` tag and is named `SCREENSHOT_v<ver>_<size>KB.img`. Never for hardware, like debug images. The release images built from the same tree must not change: check them against the release assets with the tag's build ID |
 
 **Image finalisation** (`scripts/finalize_rom.py`, run in the romtool container): pad to the exact size (192/256/512 KB) with a **computed pattern**, never zeros: the word at each even offset is `fill_word(offset)`, which the self-test's stress reads recompute (EPIC-03 STORY-11); then write the self-test's words and the 32-bit big-endian additive checksum. ST/STE: field at `size-4`. Amiga: payload must end before the **kickety-split** marker at `0x40000` (checked against `__rom_payload_end` in the map), the pattern on both sides of it, checksum field at `0x7FFE4` excluding the 4-byte Kickstart checksum at `0x7FFE8`, then `romtool copy -c` fixes the footer and `romtool info` validates. Published artifacts use only canonical names (`RSWIT192.PRG`, `RSWIT256.PRG`, `RESCUE_SWITCHER_v<ver>_<size>KB.img`); do not reintroduce timestamped copies.
 
