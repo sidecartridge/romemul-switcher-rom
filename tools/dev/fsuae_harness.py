@@ -37,7 +37,7 @@ KEY_TIMEOUT = 4.0
 def fsuae_config(image, serial, run_dir, args):
     lines = [
         "[fs-uae]",
-        "amiga_model = A500",
+        f"amiga_model = {args.model.upper()}",
         f"kickstart_file = {image}",
         f"chip_memory = {args.chip}",  # 512 KB and nothing else by default (D-07)
         f"slow_memory = {args.slow}",
@@ -80,6 +80,9 @@ def main():
     parser.add_argument("--exit", choices=sorted(hc.EXITS),
                         help="change the built-in data so the chooser ends on that "
                              "screen: a key must start it again")
+    parser.add_argument("--model", choices=["a500", "a600"], default="a500",
+                        help="the Amiga model: an A600 has a Gayle, which the "
+                             "self-test must name (EPIC-06)")
     parser.add_argument("--no-warp", action="store_true",
                         help="run at the A500's own speed")
     parser.add_argument("--interactive", action="store_true",
@@ -91,7 +94,7 @@ def main():
         fsuae = hc.emulator_path("fsuae")
     except hc.HarnessError as err:
         hc.die(str(err))
-    label = "fsuae-amiga-a500" + ("-corrupt" if args.corrupt else "") + \
+    label = f"fsuae-amiga-{args.model}" + ("-corrupt" if args.corrupt else "") + \
         (f"-chip{args.chip}" if args.chip != 512 else "") + \
         (f"-slow{args.slow}" if args.slow else "") + \
         (f"-stuck-a{args.stuck_line}" if args.stuck_line else "") + \
@@ -175,7 +178,8 @@ def main():
                            stuck_line=args.stuck_line, stuck_data=args.stuck_data,
                            stress_fault=args.stress_fault, soak=args.soak,
                            stress_alias=args.stress_alias,
-                           machine="amiga", ram=(args.chip, args.slow))
+                           machine="amiga", ram=(args.chip, args.slow),
+                           model=args.model)
     except (hc.HarnessError, OSError) as err:
         error = str(err)
     finally:

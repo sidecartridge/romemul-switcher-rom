@@ -53,6 +53,7 @@ runs=(
   "fsuae --stress-alias 18"
   "fsuae --chip 1024 --slow 512"
   "fsuae --chip 2048 --slow 1536"
+  "fsuae --model a600"
   "fsuae --exit mismatch"
   "fsuae --exit empty"
   "fsuae --exit erased"

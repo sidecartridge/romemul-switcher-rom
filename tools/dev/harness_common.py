@@ -223,7 +223,8 @@ DEFAULT_RAM = (512, 0)
 
 
 def selftest_lines(platform, stuck_line=None, stuck_data=None, machine=None,
-                   screen=None, stress_fault=None, stress_alias=None, ram=DEFAULT_RAM):
+                   screen=None, stress_fault=None, stress_alias=None, ram=DEFAULT_RAM,
+                   model="a500"):
     """The trace lines the self-test (EPIC-03) must print between its start and
     end lines, in order, as (step name, pattern). Each test story adds its own.
     ram: the two parts the RAM probe must find, in KB (STORY-13)."""
@@ -258,9 +259,14 @@ def selftest_lines(platform, stuck_line=None, stuck_data=None, machine=None,
     if machine == "amiga":
         # FS-UAE's A500: an OCS Agnus, PAL (ID 0x00), or an ECS one (0x20) when
         # it is given more than the 512 KB of chip RAM an OCS Agnus can address.
-        agnus = 0x00 if ram[0] <= 512 else 0x20
+        # The A600 has an ECS Agnus whatever its chip RAM.
+        agnus = 0x00 if ram[0] <= 512 and model == "a500" else 0x20
         lines.append((f"machine amiga, Agnus 0x{agnus:02x}",
                       rf"@@ selftest machine amiga chip=0x{agnus:02x} denise=0x[0-9a-f]{{2}}\n"))
+        # The chip that decodes the bus (EPIC-06): the A600's Gayle answers
+        # with its ID, 0xD0; the A500 has a Gary.
+        chip = "Gayle id=0xd0" if model == "a600" else "Gary id=0x00"
+        lines.append((f"bus chip {chip}", rf"@@ selftest buschip {chip}\n"))
     elif machine is not None:
         lines.append((f"machine {machine}",
                       rf"@@ selftest machine {machine} chip=0x00 denise=0x00\n"))
@@ -444,7 +450,7 @@ def stuck_line_copy(src, dst, platform, n):
 
 def run_session(trace, press, shot, steps, platform, corrupt, screen=None,
                 stuck_line=None, stuck_data=None, machine=None, stress_fault=None,
-                soak=False, stress_alias=None, ram=DEFAULT_RAM):
+                soak=False, stress_alias=None, ram=DEFAULT_RAM, model="a500"):
     """The scripted session, the same on every emulator (EPIC-00 STORY-03, STORY-04).
 
     press(key, expect, consume) sends one key ("down", "up", "left", "right",
@@ -492,7 +498,7 @@ def run_session(trace, press, shot, steps, platform, corrupt, screen=None,
     start = trace.pos
     for name, pattern in selftest_lines(platform, stuck_line, stuck_data,
                                         machine, screen, stress_fault, stress_alias,
-                                        ram):
+                                        ram, model):
         need(f"self-test {name}", pattern, 60)
     # The ping, the reliability count and the flash reads are skipped in a
     # test build; only the injected fault, if any, fails.

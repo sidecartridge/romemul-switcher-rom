@@ -28,6 +28,10 @@ typedef struct {
   unsigned char monitor_mono;      /* its last sample: 1 for mono */
   unsigned short monitor_changes;  /* how often it changed between samples */
   unsigned short monitor_samples;
+  /* Amiga: the chip that decodes the bus, "Gayle" when its ID register
+     answers (A600, A1200), otherwise "Gary" (EPIC-06); Atari: 0, no line. */
+  const char *bus_chip;
+  unsigned short bus_chip_id; /* Gayle's ID, 0xD0 or 0xD1; Gary: 0 */
 } platform_machine_t;
 
 void platform_probe_machine(platform_machine_t *out);

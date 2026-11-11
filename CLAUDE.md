@@ -33,7 +33,7 @@ How to keep them in sync:
 
 Facts the siblings rely on that are easy to break here:
 
-- The firmware zero-fills the whole 60 KB catalog after the last record and caps it at 64 records (`ROM_MAX_FILES`). `parse_rom_description()` relies on that: it walks records until one starts with a zero byte, with no upper bound.
+- The firmware writes one empty record after the last one and caps the catalog at 64 records (`ROM_MAX_FILES`). Since firmware `da87d2e` (its EPIC-08) it erases only the sectors those records use, so the records after the empty one may be old data. `parse_rom_description()` stops at a record starting with `0x00` or `0xFF`, or after 240 records (EPIC-04 STORY-02). Keep that stop wherever the catalog is walked: never read past the empty record.
 - `blocks` is a u32 at record byte 64. This ROM reads only its low 16 bits, which is enough up to 65535 blocks.
 - Parameters-page bytes 516 to 532 hold the `CONFIG.TXT` words that only the host switcher reads. Bytes 536 to 767 may hold stray data on a device.
 - The firmware rejects a rescue ROM above 512 KB. Debug firmware holds at most 496 KB in SRAM (firmware D-16), so test the 512 KB Amiga image with release firmware.
@@ -58,9 +58,9 @@ tools/dev/build.sh ste debug-test  # types: release | debug | test | debug-test 
 ./build.sh st                      # release build, published to dist/st/ (st | ste | amiga | all)
 ./build.sh all                     # replaces dist/, so tell the firmware first (C-06)
 tools/dev/romtool.sh info <img>    # the pinned romtool (amitools 0.8.1), repo-relative paths
-tools/dev/all_harness.sh           # build all release and debug-test images, run 31 sessions (~5 min)
+tools/dev/all_harness.sh           # build all release and debug-test images, run 32 sessions (~5 min)
 python3 tools/dev/hatari_harness.py --image ste --machine megaste   # one session; also --monitor mono, --memsize KB, --corrupt, --stuck-line N, --stuck-data K, --exit mismatch|empty|erased
-python3 tools/dev/fsuae_harness.py # the Amiga session over the serial port; also --chip KB, --slow KB, --corrupt, --stuck-line N, --stuck-data K, --exit mismatch|empty|erased, --no-warp
+python3 tools/dev/fsuae_harness.py # the Amiga session over the serial port; also --chip KB, --slow KB, --corrupt, --stuck-line N, --stuck-data K, --exit mismatch|empty|erased, --model a600, --no-warp
 tools/dev/measure_builds.sh        # payload and free space of every image, as a Markdown table
 make clean                         # removes build/st* and build/amiga* (outputs of a direct make)
 make format-check                  # clang-format dry run over src/**/*.{c,h}
@@ -103,6 +103,7 @@ File map, for orientation:
 | `st/natfeat.s`, `st/htrace.c` | Hatari NatFeats trace (`_DEBUG` only) |
 | `st/mem.h`, `st/rom_abs.ld.S` | RAM layout with `_Static_assert` guards; ROM linker script template |
 | `amiga/startup.s` | ROM bootstrap: overlay off, code/`.data` copy to RAM, `.bss` clear |
+| `amiga/probe.s` | `amiga_probe_word` / `amiga_probe_write_byte` under a bus-error handler, for the Gayle check (EPIC-06) |
 | `amiga/reset.s` | `amiga_cold_reset`: `reset` and `jmp` through offset 2, run from RAM (EPIC-05) |
 | `amiga/screen.c` | hires 2-bitplane display and framebuffer, DiagROM-inspired structure |
 | `amiga/kbd.c` | CIAA keyboard polling and handshake |

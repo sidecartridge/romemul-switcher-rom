@@ -231,8 +231,67 @@ void platform_probe_memory(platform_memory_t *out) {
   out->part_name[1] = "slow";
 }
 
+/* The chip that decodes the bus (EPIC-06 STORY-01): Gayle on the A600 and
+   A1200, Gary on the A500, A500+, A2000 and CDTV. Whether the machine takes a
+   1 MB Kickstart cannot be read from the ROM: Gary decodes $E00000 as ROM
+   too, and only the socket's A19 wiring differs, which the board's mirror
+   hides. Gayle's ID register, as MAME models it (src/mame/amiga/gayle.cpp):
+   a write to $DE1000 restarts the ID, then each read there returns its next
+   bit, most significant first, in bit 7 of the byte (bit 15 of the word).
+   The write and the reads run under a bus-error handler (probe.s). A machine
+   without Gayle returns whatever the bus holds (FS-UAE's A500 gave 0x22, then
+   0xFF after a change to the code around the reads), so
+   the ID is read twice, each time from a fresh write, and only an exact
+   Gayle ID read both times counts. */
+extern long amiga_probe_word(unsigned long address);
+extern long amiga_probe_write_byte(unsigned long address, unsigned long value);
+
+enum {
+  kGayleIdAddress = 0x00DE1000UL,
+  kGayleIdBits = 8U,
+  kGayleIdBit = 0x8000U,
+  kGayleIdA600 = 0xD0U,
+  kGayleIdA1200 = 0xD1U,
+  kGayleIdFault = 0x100U
+};
+
+/* One reading of the ID register, or 0x100 on a bus error. */
+static unsigned short amigaGayleIdRead(void) {
+  unsigned short id = 0U;
+  unsigned short i;
+
+  if (amiga_probe_write_byte(kGayleIdAddress, 0UL) < 0L) {
+    return kGayleIdFault;
+  }
+  for (i = 0U; i < kGayleIdBits; ++i) {
+    const long word = amiga_probe_word(kGayleIdAddress);
+
+    if (word < 0L) {
+      return kGayleIdFault;
+    }
+    id = (unsigned short)((id << 1) |
+                          ((((unsigned long)word & kGayleIdBit) != 0UL) ? 1U : 0U));
+  }
+  return id;
+}
+
+/* Gayle's ID, or 0 when no Gayle answered. */
+static unsigned short amigaGayleId(void) {
+  const unsigned short first = amigaGayleIdRead();
+  const unsigned short second = amigaGayleIdRead();
+
+  TRACE("gayle id reads %03x %03x", (unsigned int)first, (unsigned int)second);
+  if (first != second) {
+    return 0U;
+  }
+  return (first == kGayleIdA600 || first == kGayleIdA1200) ? first : 0U;
+}
+
 void platform_probe_machine(platform_machine_t *out) {
   const unsigned short agnus = (unsigned short)((AMIGA_VPOSR >> 8) & 0x7FU);
+
+  out->bus_chip_id = amigaGayleId();
+  out->bus_chip = (out->bus_chip_id != 0U) ? "Gayle" : "Gary";
 
   out->name = "amiga";
   out->label = "Amiga";

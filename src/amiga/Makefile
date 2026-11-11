@@ -75,7 +75,7 @@ SRCS_C += screenshot.c
 endif
 SRCS_S_ROM := startup.s
 # Linked into .ramtext like the C objects: it must run from RAM (EPIC-05).
-SRCS_S_RAM := reset.s
+SRCS_S_RAM := reset.s probe.s
 VPATH := . ../common
 
 OBJS_C := $(SRCS_C:%=$(BUILD_DIR)/%.o)
