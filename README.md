@@ -91,7 +91,7 @@ romemul-switcher-rom/
 2. `git` and `bash` on macOS, Linux, or WSL2
 
 The toolchain images are pulled or built on first use: the Atari GCC image
-`logronoide/atarist-toolkit-docker-x86_64:1.4.0`, pinned by digest, and
+`logronoide/atarist-toolkit-docker-x86_64:1.5.0`, pinned by digest, and
 `romemul-switcher-rom/romtool:1` (amitools 0.8.1), built from
 `tools/dev/docker/romtool/`. Both are named in `tools/dev/toolchain.sh`.
 

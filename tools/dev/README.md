@@ -13,7 +13,7 @@ tools/dev/build.sh <st|ste|amiga> <release|debug|test|debug-test|screenshot>
 - The output goes to `tools/dev/builds/<platform>-<type>/`: the finalized
   `RESCUE_SWITCHER_v<ver>_<size>KB.img`, `ROMSWITC.PRG` on ST and STE, the link maps, and the
   objects under `obj/`. The folder is emptied first, inside the container.
-- The toolchain images are pinned in `toolchain.sh`. `logronoide/atarist-toolkit-docker-x86_64:1.4.0`,
+- The toolchain images are pinned in `toolchain.sh`. `logronoide/atarist-toolkit-docker-x86_64:1.5.0`,
   by digest, compiles all three images. `romemul-switcher-rom/romtool:1` (amitools 0.8.1 on
   Python 3.12, built from `docker/romtool/` on first use) runs `scripts/finalize_rom.py`.
 - Every build carries a build ID: `<sha7>`, then `-dirty.<hash>` when `src/`, `Makefile` or

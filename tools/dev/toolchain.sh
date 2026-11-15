@@ -5,7 +5,7 @@
 # All three images build with the Atari GCC toolchain (GCC 4.6.4, binutils
 # 2.30): Diego's atarist-toolkit-docker, pinned by tag and digest. The tag is
 # the one sidecartos-config pins.
-ATARI_IMAGE="logronoide/atarist-toolkit-docker-x86_64:1.4.0@sha256:016434131cf53f627c365e55262845fba53f30a7de87a1f122d58f8fa6aeeebe"
+ATARI_IMAGE="logronoide/atarist-toolkit-docker-x86_64:1.5.0@sha256:5b5806bfc6c84c2cf2cebf34f13c7ea472d88d8d02ccc9f0ad71572654e215ad"
 # romtool (amitools 0.8.1, as sidecartos-config pins it) on Python 3.12: runs
 # scripts/finalize_rom.py, which needs romtool for the Kickstart checksum and the
 # check of the Amiga image. Built from tools/dev/docker/romtool.
